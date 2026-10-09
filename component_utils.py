@@ -31,25 +31,22 @@ def _2D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):  # pylint: di
     return jnp.concatenate([_2D(a1), _2D(a2)])
 
 
-"""When training, we'll often mutate parameters by adding a random step to the
-current parameter value. Sometimes the resulting sum will exceed the parameter's
-constraints. In that case, we'll need to constrain the parameter back to the
-original constraints.
+# When training, we'll often mutate parameters by adding a random step to the
+# current parameter value. Sometimes the resulting sum will exceed the parameter's
+# constraints. In that case, we'll need to constrain the parameter back to the
+# original constraints.
 
-The easiest way is to clip the parameters like jnp.clip(x, xmin, xmax) so that
-x < xmin --> xmin and x > xmin --> xmax. That approach greatly increases the
-chance of a parameter reaching its exact min or max value. If this is desirable,
-then just use jnp.clip.
+# The easiest way is to clip the parameters like jnp.clip(x, xmin, xmax) so that
+# x < xmin --> xmin and x > xmax --> xmax. That approach greatly increases the
+# chance of a parameter reaching its exact min or max value. If this is desirable,
+# then just use jnp.clip.
 
-However, when x is an array, there's a significant chance that multiple values
-in x will be clipped to the same endpoint. That's inconvenient for components
-such as pwlcurves where duplicate parameters can cause problems. (A pwlcurve's
-x-values are supposed to be unique. Duplicate xs cause errors or wasted points
-or discontinuities, depending on the implementation.) If we want to keep params
-unique, then a different constraint enforcement is preferred.
-"""
-
-
+# However, when x is an array, there's a significant chance that multiple values
+# in x will be clipped to the same endpoint. That's inconvenient for components
+# such as pwlcurves where duplicate parameters can cause problems. (A pwlcurve's
+# x-values are supposed to be unique. Duplicate xs cause errors or wasted points
+# or discontinuities, depending on the implementation.) If we want to keep params
+# unique, then a different constraint enforcement is preferred.
 def constrain_by_wrapping(
     x: jax.typing.ArrayLike, xmin: jax.typing.ArrayLike, xmax: jax.typing.ArrayLike
 ) -> jax.typing.ArrayLike:
@@ -71,7 +68,6 @@ def constrain_by_bouncing(
     For example, a value slightly over xmax becomes a value slightly under xmax
     to fit the constraints.
     """
-
     diff = xmax - xmin
     # constrained(x) is equivalent to constrained(x + 2 * diff) since two diffs
     # will bounce off both bounds and return to the starting position.
@@ -84,8 +80,8 @@ def constrain_by_bouncing(
 
 def perturb_array(
     a: jax.typing.ArrayLike,
-    min: jax.typing.ArrayLike,
-    max: jax.typing.ArrayLike,
+    min_val: jax.typing.ArrayLike,
+    max_val: jax.typing.ArrayLike,
     scale: float,
     key: jax.Array,
 ):
@@ -100,23 +96,23 @@ def perturb_array(
     # If a is (N, M) and min&max are (N), then default broadcasting will match
     # the wrong axis unless we expand min and max to (N, 1).
     # In all other cases, the default broadcasting is as intended.
-    if jnp.ndim(a) == 2 and jnp.ndim(min) == 1:
-        min = jnp.expand_dims(min, -1)
-        max = jnp.expand_dims(max, -1)
+    if jnp.ndim(a) == 2 and jnp.ndim(min_val) == 1:
+        min_val = jnp.expand_dims(min_val, -1)
+        max_val = jnp.expand_dims(max_val, -1)
 
-    max_shift = scale * (max - min)
+    max_shift = scale * (max_val - min_val)
     shifts = jax.random.uniform(
         key, shape=jnp.shape(a), dtype=dtype, minval=-max_shift, maxval=max_shift
     )
 
-    new_a = constrain_by_bouncing(a + shifts, min, max)
+    new_a = constrain_by_bouncing(a + shifts, min_val, max_val)
     return new_a, subkey
 
 
 def randomize_array(
-    a: jax.typing.ArrayLike,
-    min: jax.typing.ArrayLike,
-    max: jax.typing.ArrayLike,
+    a: jax.typing.ArrayLike,    # Array of Floats
+    min_val: jax.typing.ArrayLike,
+    max_val: jax.typing.ArrayLike,
     key: jax.Array,
 ):
     """Returns `a` randomized between max and min.
@@ -125,14 +121,12 @@ def randomize_array(
     then `a` must be an array whose first dimension is the same size as min&max.
     """
     key, subkey = jax.random.split(key)
-    dtype = jax.dtypes.result_type(a)
-
     # If a is (N, M) and min&max are (N), then default broadcasting will match
     # the wrong axis unless we expand min and max to (N, 1).
     # In all other cases, the default broadcasting is as intended.
-    if jnp.ndim(a) == 2 and jnp.ndim(min) == 1:
-        min = jnp.expand_dims(min, -1)
-        max = jnp.expand_dims(max, -1)
+    if jnp.ndim(a) == 2 and jnp.ndim(min_val) == 1:
+        min_val = jnp.expand_dims(min_val, -1)
+        max_val = jnp.expand_dims(max_val, -1)
 
-    new_a = jax.random.uniform(key=key, shape=jnp.shape(a), minval=min, maxval=max)
+    new_a = jax.random.uniform(key=key, shape=jnp.shape(a), minval=min_val, maxval=max_val)
     return new_a, subkey

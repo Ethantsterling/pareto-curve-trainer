@@ -34,6 +34,7 @@ class scalar(NamedTuple):
     return self.s
 
   def merge(self, other) -> Self:
+    """Concatenates this `scalar` with another `scalar`."""
     s = jnp.concatenate([cu._1D(self.s), cu._1D(other.s)])
     smin = jnp.concatenate([cu._1D(self.smin), cu._1D(other.smin)])
     smax = jnp.concatenate([cu._1D(self.smax), cu._1D(other.smax)])
@@ -41,6 +42,7 @@ class scalar(NamedTuple):
 
   # NamedTuple uses __len__ so we can't override that.
   def num_rows(self) -> int:
+    """Returns the number of scalar values s in this `scalar`."""
     return len(self.s) if jnp.ndim(self.s) else 1
 
   def __eq__(self, other: Self):
