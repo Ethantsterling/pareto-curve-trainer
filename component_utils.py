@@ -6,6 +6,7 @@ import jax.numpy as jnp
 
 
 class Mono(IntEnum):
+    """Monotonicity constraints suitable for curves."""
     NON_MONO = 0
     UP = 1
     DOWN = 2
@@ -29,6 +30,47 @@ def _2D(a: jax.typing.ArrayLike):  # pylint: disable=C0103:invalid-name
 
 def _2D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):  # pylint: disable=C0103:invalid-name
     return jnp.concatenate([_2D(a1), _2D(a2)])
+
+
+def _maybe_sorted_1d(a: jnp.array, mono: Mono) -> jnp.ndarray:
+    """Sort `a` to match mono's direction."""
+    print('mono is', mono)
+    if mono == Mono.UP:
+        return a.sort()
+    if mono == Mono.DOWN:
+        return jnp.flip(a.sort())
+    return a
+
+
+def maybe_sorted(a: jnp.ndarray, mono: jax.typing.ArrayLike) -> jnp.ndarray:
+    """Sort `a` to match mono's direction."""
+    # a is (N, M) and mono (N).
+    # print("sorting", a, "with mono", mono)
+    if a.ndim == 1:
+        return _maybe_sorted_1d(a, jnp.squeeze(mono))
+    upsorted = a.sort()
+    downsorted = jnp.flip(upsorted, axis=-1)
+    mono = jnp.reshape(mono, shape=(-1, 1))
+    return jnp.where(mono == Mono.UP, upsorted,
+                    jnp.where(mono == Mono.DOWN, downsorted, a))
+
+
+def _conditional_mono_sort(a: jnp.ndarray, mono: int):
+    def non_mono(a):
+        return a
+    def up(a):
+        return jnp.sort(a)
+    def down(a):
+        return jnp.flip(jnp.sort(a))
+    return jax.lax.switch(mono, [non_mono, up, down], a)
+
+
+def vectorized_conditional_mono_sort(
+    a: jnp.ndarray,    # 2D array.
+    mono: jnp.ndarray  # 1D array of int Mono enums.
+    ) -> jnp.ndarray:  # 2D array of `a` conditionally sorted.
+    """Returns `a` where the ith row is conditionally sorted based on mono[i]."""
+    return jax.vmap(_conditional_mono_sort, in_axes=(0, 0))(a, mono)
 
 
 # When training, we'll often mutate parameters by adding a random step to the

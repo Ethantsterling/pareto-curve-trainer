@@ -5,7 +5,6 @@ import os
 os.environ["JAX_PLATFORMS"] = "cpu"
 import jax  # pylint: disable=wrong-import-position
 import jax.numpy as jnp  # pylint: disable=wrong-import-position
-
 import component_utils as cu
 
 
