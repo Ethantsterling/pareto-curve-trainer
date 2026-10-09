@@ -27,12 +27,12 @@ def test_num_rows():
     assert _test_map_2d.num_rows() == 2
 
 
-def catmap_merge():
+def test_catmap_merge():
     expected_merge = catmap(
         map=internal_catmap_1d.merge(internal_catmap_2d),
         ymin=jnp.array([0, 0, 0]),
         ymax=jnp.array([5, 5, 5]),
-        mono=jnp.array([Mono.NONE, Mono.NONE, Mono.NONE]))
+        mono=jnp.array([Mono.NON_MONO, Mono.NON_MONO, Mono.NON_MONO]))
 
     assert _test_map_1d.merge(_test_map_2d) == expected_merge
 
@@ -53,6 +53,7 @@ def test_catmap_perturbed():
     assert _test_map_1d._constraints_equal(_test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))[0])
     assert _test_map_2d._constraints_equal(_test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))[0])
 
+
 # Perturbing should obey monotonicity as assigned.
 def _map_is_mono_up(map: jnp.array) -> bool:
   return (map.map.ys.sort(axis=-1) == map.map.ys).all()
@@ -60,6 +61,7 @@ def _map_is_mono_down(map: jnp.array) -> bool:
   return (map.map.ys.sort(axis=-1) == jnp.flip(map.map.ys, axis=-1)).all()
 def _map_is_nonmono(map: jnp.array) -> bool:
   return not _map_is_mono_up(map) and not _map_is_mono_down(map)
+
 
 # Validate the monotonicity measures.
 assert _map_is_nonmono(_test_map_1d)

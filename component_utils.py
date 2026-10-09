@@ -6,30 +6,29 @@ import jax.numpy as jnp
 
 
 class Mono(IntEnum):
-  NON_MONO = 0
-  UP = 1
-  DOWN = 2
+    NON_MONO = 0
+    UP = 1
+    DOWN = 2
 
 
 # Utilities for forcing dimensionality or stacking components.
-def _1D(a: jax.typing.ArrayLike):
+def _1D(a: jax.typing.ArrayLike):  # pylint: disable=C0103:invalid-name
     return jnp.reshape(a, (-1,))
 
 
-def _1D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):
+def _1D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):  # pylint: disable=C0103:invalid-name
     return jnp.concatenate([_1D(a1), _1D(a2)])
 
 
-def _2D(a: jax.typing.ArrayLike):
+def _2D(a: jax.typing.ArrayLike):  # pylint: disable=C0103:invalid-name
     """Make sure the array is 2D."""
     if jnp.ndim(a) == 1:
         return jnp.reshape(a, (1, -1))
     return a
 
 
-def _2D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):
+def _2D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):  # pylint: disable=C0103:invalid-name
     return jnp.concatenate([_2D(a1), _2D(a2)])
-
 
 
 """When training, we'll often mutate parameters by adding a random step to the
@@ -49,6 +48,8 @@ x-values are supposed to be unique. Duplicate xs cause errors or wasted points
 or discontinuities, depending on the implementation.) If we want to keep params
 unique, then a different constraint enforcement is preferred.
 """
+
+
 def constrain_by_wrapping(
     x: jax.typing.ArrayLike, xmin: jax.typing.ArrayLike, xmax: jax.typing.ArrayLike
 ) -> jax.typing.ArrayLike:
