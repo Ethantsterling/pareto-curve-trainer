@@ -79,7 +79,7 @@ class Catmap(NamedTuple):
                 jnp.all(self.mono == other.mono))
 
     def __eq__(self, other: Self) -> bool:
-       return (self.map == other.map) and self.constraints_equal(other)
+        return (self.map == other.map) and self.constraints_equal(other)
 
     # NamedTuple uses __len__ so we can't override that.
     def num_rows(self) -> int:

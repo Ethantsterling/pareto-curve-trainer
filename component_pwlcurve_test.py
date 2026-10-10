@@ -1,14 +1,14 @@
 # pylint: disable=missing-function-docstring
+# pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
 os.environ["JAX_PLATFORMS"] = "cpu"
-import jax  # pylint: disable=wrong-import-position
-import jax.numpy as jnp  # pylint: disable=wrong-import-position
+import jax  
+import jax.numpy as jnp
 import component_utils as cu
 from component_utils import Mono
 from component_pwlcurve import (
-    jax_curve_slopes, jax_curve_eval, jax_curves_slopes, jax_curves_eval, struct_pwlcurve,
-    Pwlcurve)
+    jax_curve_slopes, jax_curve_eval, jax_curves_slopes, jax_curves_eval, Pwlcurve)
 
 
 xs = jax.random.uniform(key=jax.random.key(123), shape=5)
@@ -89,7 +89,7 @@ def test_randomized():
     assert not randomized_curve == test_pwlcurve
 
 
-def test_merge(): 
+def test_merge():
     expected_pwlcurve = Pwlcurve(
         xs=jnp.concatenate([curves_xs, curves_xs]),
         ys=jnp.concatenate([curves_ys, curves_ys]),
@@ -102,5 +102,5 @@ def test_merge():
     assert expected_pwlcurve == test_pwlcurve.merge(test_pwlcurve)
 
 
-def test_num_rows():    
+def test_num_rows():
     assert test_pwlcurve.num_rows() == 2

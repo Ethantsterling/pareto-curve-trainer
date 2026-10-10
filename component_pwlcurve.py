@@ -138,7 +138,7 @@ def jax_curves_eval(
     return knot_y - xgap * slope
 
 
-class struct_pwlcurve(NamedTuple):
+class StructPwlcurve(NamedTuple):
     """A single PWLCurve. Not vectorized."""
     xs: jnp.ndarray
     ys: jnp.ndarray
@@ -175,17 +175,11 @@ class Pwlcurve(NamedTuple):
         """Randomly shifts each curve coordinate by up to a scaled fraction of its range."""
         xs, subkey = cu.perturb_array(self.xs, self.xmin, self.xmax, scale, key)
         ys, subkey = cu.perturb_array(self.ys, self.ymin, self.ymax, scale, subkey)
-        # Problem: we need to perturb xs in the transformed space.
-        # But to do that, we'd need to transform xs (and min/max), perturb, and then
-        # transform back. Which requires a reversible transform with its reverse
-        # registered. That's... doable, but annoying.
-        # For now we'll just quietly ignore the need to transform in fx-space.
-        # It would be possible for trainable_curve to keep its own raw version of xs
-        # but we'd still need the reverse transform to get back into raw x space.
-        # Alternatively, we could express curves in the transformed space. But that
-        # makes them harder for humans to read.
+        # TODO: when we add fx transforms, do the perturbing in the transformed space.
+        # This likely requires transforming xs & constraints, perturbing, and transforming
+        # back, which also requires transforms be reversible.
 
-        # Always make xs mono-up,
+        # Always sort xs. Follow the mono constraints for ys.
         xs = jnp.sort(xs)  # Sorts on rightmost axis by default, which is what we want.
         ys = cu.vectorized_conditional_mono_sort(ys, self.mono)
         new_trainable_curve = self._replace(xs=xs, ys=ys)
@@ -207,9 +201,9 @@ class Pwlcurve(NamedTuple):
             mono=jnp.concatenate([self.mono, other.mono]),
         )
 
-    def as_struct_pwlcurves(self) -> List[struct_pwlcurve]:
+    def as_struct_pwlcurves(self) -> List[StructPwlcurve]:
         """Returns a list of single pwlcurves without training constraints."""
-        return [struct_pwlcurve(xarray, yarray) for
+        return [StructPwlcurve(xarray, yarray) for
                 (xarray, yarray) in zip(self.xs, self.ys)]
 
     # NamedTuple uses __len__ so we can't override that.
@@ -226,6 +220,6 @@ class Pwlcurve(NamedTuple):
                 jnp.all(self.mono == other.mono))
 
     def __eq__(self, other):
-        return (jnp.all(self.xs == other.xs) & 
+        return (jnp.all(self.xs == other.xs) &
                 jnp.all(self.ys == other.ys) &
                 self.constraints_equal(other))

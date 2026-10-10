@@ -32,6 +32,7 @@ def _2D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):  # pylint: di
     return jnp.concatenate([_2D(a1), _2D(a2)])
 
 
+# TODO: Consolidate maybe_sorted and conditional_mono_sort. They serve the same purpose.
 def _maybe_sorted_1d(a: jnp.array, mono: Mono) -> jnp.ndarray:
     """Sort `a` to match mono's direction."""
     print('mono is', mono)
@@ -55,7 +56,7 @@ def maybe_sorted(a: jnp.ndarray, mono: jax.typing.ArrayLike) -> jnp.ndarray:
                     jnp.where(mono == Mono.DOWN, downsorted, a))
 
 
-def _conditional_mono_sort(a: jnp.ndarray, mono: int):
+def _conditional_mono_sort(a: jnp.ndarray, mono: Mono):
     def non_mono(a):
         return a
     def up(a):
