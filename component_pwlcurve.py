@@ -1,3 +1,4 @@
+"""A trainable vectorized piecewise-linear-curve component and supporting functions."""
 import jax
 import jax.numpy as jnp
 

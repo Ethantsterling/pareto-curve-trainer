@@ -19,7 +19,6 @@ def _extend_component(c, length: int):
     return jax.tree_util.tree_map(lambda arr: _extend_array(arr, length), c)
 
 
-# @jax.jit
 class Population(NamedTuple):
     """A collection of variations of the same model for population training."""
     trial_ids: jax.typing.ArrayLike  # These should be in ascending order to avoid headache.
@@ -44,10 +43,6 @@ class Population(NamedTuple):
         if first_id is not None:
             return first_id + jnp.arange(self.num_trials())
         if increment_index:
-            # Subtle JAX note: we can't put self.max_trial_id() directly in the arange
-            # because JAX will think that the arange's length depends on the value of
-            # self.max_trial_id(), which is a value in an array and therefore not
-            # known at jitting time.
             return self.max_trial_id() + jnp.arange(1, 1 + self.num_trials())
         return self.trial_ids
 
@@ -70,7 +65,6 @@ class Population(NamedTuple):
         new_components = {name: component.perturbed(scale=scale, key=key_i)[0] for
                           (name, component), key_i in zip(self.components.items(), subkeys)}
 
-
         return Population(trial_ids=new_trial_ids, components=new_components), key
 
     def randomized(self, key: jax.Array, increment_index: bool=True) -> tuple[Self, jax.Array]:
@@ -81,7 +75,7 @@ class Population(NamedTuple):
                           (name, component), key_i in zip(self.components.items(), subkeys)}
         return Population(trial_ids=new_trial_ids, components=new_components), key
 
-    def fill_population(self, fill_size: int, key: jax.Array) -> tuple[Self, jax.Array]:
+    def fill(self, fill_size: int, key: jax.Array) -> tuple[Self, jax.Array]:
         """Returns a new population padded with randomized entries."""
         # This can be very similar to perturbed, except that we build a random new
         # version and end with a merge.
@@ -97,7 +91,7 @@ class Population(NamedTuple):
         # The original entries are preserved in case they were important.
         return self.stack(population_extension), key
 
-    def filter_population(self, filter_array: jnp.ndarray) -> Self:
+    def filter(self, filter_array: jnp.ndarray) -> Self:
         """Return only trials matching the filter, which can be indices or a mask."""
         new_trial_ids = self.trial_ids[filter_array]
         new_components = jax.tree.map(lambda node: node[filter_array], self.components)
@@ -114,22 +108,12 @@ class Population(NamedTuple):
                 (self.components == other.components))
 
 
-    @classmethod
-    def from_components(cls, components: dict):
-        """Create a Population from a list of components."""
-        component_list = list(components.values())
-        size = component_list[0].num_rows()
-        for c in component_list:
-          assert c.num_rows() == size
-        trial_ids = jnp.arange(1, size + 1)
-        return cls(trial_ids=trial_ids, components=components)
-
-
-  # # Make this a classmethod?
-  # def from_components(components: dict):
-  #     component_list = list(components.values())
-  #     size = component_list[0].num_rows()
-  #     for c in component_list:
-  #       assert c.num_rows() == size
-  #     trial_ids = jnp.arange(1, size + 1)
-  #     return Population(trial_ids=trial_ids, components=components)
+# This would be cleaner as a classmethod on Population, but that gives JAX trouble.
+def from_components(components: dict):
+    """Create a Population from a list of components."""
+    component_list = list(components.values())
+    size = component_list[0].num_rows()
+    for c in component_list:
+        assert c.num_rows() == size
+    trial_ids = jnp.arange(1, size + 1)
+    return Population(trial_ids=trial_ids, components=components)

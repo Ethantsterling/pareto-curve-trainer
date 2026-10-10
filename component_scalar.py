@@ -46,8 +46,13 @@ class Scalar(NamedTuple):
         """Returns the number of scalar values s in this `scalar`."""
         return len(self.s) if jnp.ndim(self.s) else 1
 
+    def constraints_equal(self, other):
+        """Returns whether the constraints """
+        return ((jnp.shape(self.smin) == jnp.shape(other.smin)) &
+                (jnp.shape(self.smax) == jnp.shape(other.smax)) &
+                jnp.all(self.smin == other.smin) &
+                jnp.all(self.smax == other.smax))
+
     def __eq__(self, other: Self):
         s_identical = (jnp.shape(self.s) == jnp.shape(other.s)) & jnp.all(self.s == other.s)
-        smin_matches = jnp.all(self.smin == other.smin)
-        smax_matches = jnp.all(self.smax == other.smax)
-        return s_identical & smin_matches & smax_matches
+        return s_identical & self.constraints_equal(other)

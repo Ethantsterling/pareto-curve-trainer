@@ -1,5 +1,6 @@
 """Tests for component_utils.py."""
 # pylint: disable=missing-function-docstring
+# pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
 os.environ["JAX_PLATFORMS"] = "cpu"

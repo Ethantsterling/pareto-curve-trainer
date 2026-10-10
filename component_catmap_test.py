@@ -1,4 +1,5 @@
 # pylint: disable=missing-function-docstring
+# pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
 os.environ["JAX_PLATFORMS"] = "cpu"
@@ -8,6 +9,10 @@ import jax.numpy as jnp
 
 from component_utils import Mono
 from component_catmap import Catmap, InternalCatmap
+
+# Ensure jittability in these tests.
+InternalCatmap = jax.jit(InternalCatmap)
+Catmap = jax.jit(Catmap)
 
 
 _mapdata = jnp.array([3, 2, 1, 0])

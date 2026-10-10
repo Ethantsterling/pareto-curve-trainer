@@ -10,6 +10,8 @@ from component_utils import Mono
 from component_pwlcurve import (
     jax_curve_slopes, jax_curve_eval, jax_curves_slopes, jax_curves_eval, Pwlcurve)
 
+# Ensure jittability in these tests.
+Pwlcurve = jax.jit(Pwlcurve)
 
 xs = jax.random.uniform(key=jax.random.key(123), shape=5)
 curves_xs = jnp.sort(jax.random.uniform(key=jax.random.key(124), shape=(2, 4)))

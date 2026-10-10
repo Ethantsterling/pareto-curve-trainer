@@ -129,8 +129,8 @@ test_xs['label_2'] = test_model_fn(test_target_components_2, test_xs)
 
 test_components = {
     'curve': RandomUnitPWLCurve(num_points=4, key=jax.random.key(2)),
-    'scalar_1': Scalar(.7, smin=0.0, smax=1.0),
-    'scalar_2': Scalar(.2, smin=0.0, smax=1.0),
+    'scalar_1': Scalar(jnp.array([.7]), smin=jnp.array([0.0]), smax=jnp.array([1.0])),
+    'scalar_2': Scalar(jnp.array([.2]), smin=jnp.array([0.0]), smax=jnp.array([1.0])),
     'catmap': Catmap(InternalCatmap(jnp.array([[.4, .4, .1]])), ymin=0.0, ymax=1.0),
 }
 
@@ -138,11 +138,3 @@ test_components = {
 def test_metric_fn(predictions, labels) -> jnp.ndarray:
     """A very simple metric function that just emits MSE against the labels."""
     return mse_fn(predictions, labels)
-
-
-print("Metric eval:")
-print(test_metric_fn(test_model_fn(test_target_components, test_xs), test_labels))
-print(test_metric_fn(test_model_fn(test_components, test_xs), test_labels))
-# test_labels should really be 1D, shouldn't it?
-
-

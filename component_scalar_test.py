@@ -1,12 +1,16 @@
+"""Tests for component_scalar.py."""
 # pylint: disable=missing-function-docstring
+# pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
 os.environ["JAX_PLATFORMS"] = "cpu"
 
 import jax  # pylint: disable=wrong-import-position
 import jax.numpy as jnp  # pylint: disable=wrong-import-position
-
 from component_scalar import Scalar
+
+# Ensure jittability in these tests.
+Scalar = jax.jit(Scalar)
 
 
 test_scalar = Scalar(s=3., smin=-1., smax=4.)
@@ -18,7 +22,7 @@ def test_num_rows():
     assert test_scalar.num_rows() == 1
     assert test_scalar_2.num_rows() == 1
     assert test_scalar_3.num_rows() == 2
-    
+
 
 def test_value_times_array():
     assert (test_scalar.value() * jnp.array([1., 2, 3]) == jnp.array([3., 6, 9])).all()
