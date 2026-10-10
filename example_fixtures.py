@@ -138,3 +138,16 @@ test_components = {
 def test_metric_fn(predictions, labels) -> jnp.ndarray:
     """A very simple metric function that just emits MSE against the labels."""
     return mse_fn(predictions, labels)
+
+
+# Eventually we'll want the metrics_fn to return a dictionary, I think?
+# So that we can label the metrics for posterity.
+def test_metrics_fn(xs, predictions):
+  # predictions should be (population_size, data_size).
+  # Metrics like mse_fn are built to handle that.
+  mse_1 = mse_fn(predictions, xs['label'])
+  mse_2 = mse_fn(predictions, xs['label_2'])
+  return mse_1, mse_2
+
+
+test_population = population_from_components(test_components)

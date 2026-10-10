@@ -3,10 +3,9 @@
 Instead of tracking a single line of descent, we'll fork many different ways and cull branches.
 Heavily inspired by Vizier (https://github.com/google/vizier).
 """
+from typing import NamedTuple, Self, Union
 import jax
 import jax.numpy as jnp
-
-from typing import NamedTuple, Self, Union
 
 
 def _extend_array(arr: jax.typing.ArrayLike, length: int) -> jax.Array:

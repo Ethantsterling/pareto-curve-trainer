@@ -10,8 +10,7 @@ import jax.numpy as jnp
 import population
 import example_fixtures
 
-# We don't want to jit Population directly in population.py,
-# but we do want to verify its jittability in these tests.
+# Ensure jittability in these tests.
 Population = jax.jit(population.Population)
 
 

@@ -33,6 +33,7 @@ def _2D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):  # pylint: di
 
 
 # TODO: Consolidate maybe_sorted and conditional_mono_sort. They serve the same purpose.
+# One's used for Catmap and the other for Pwlcurve, but the same operation should work for both.
 def _maybe_sorted_1d(a: jnp.array, mono: Mono) -> jnp.ndarray:
     """Sort `a` to match mono's direction."""
     print('mono is', mono)
