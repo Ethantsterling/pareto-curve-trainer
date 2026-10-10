@@ -1,7 +1,7 @@
-"""### Train"""
+"""Multiobjective population training."""
+from typing import Dict, Tuple
 import jax
 import jax.numpy as jnp
-from typing import Dict, List, Tuple
 from population import Population
 from selection import select
 
@@ -27,31 +27,19 @@ def population_train_one_step(
     combined_population = population.stack(new_population)
     combined_population_metrics = jnp.concatenate([population_metrics, new_population_metrics])
 
+    # We filter by indices instead of boolean mask for ease of jitting.
+    # JAX needs to know the size of each array at jitting time. The size of arr[indices] depends
+    # only on the size of indices, not the values of the indices contents, which works for jitting.
+    # The size of arr[bool_mask] depends on the values in bool_mask, which would break jitting.
     kept_indices = select(combined_population_metrics, target_size=len(population_metrics))
-    kept_population = combined_population.filter_population(kept_indices)
+    kept_population = combined_population.filter(kept_indices)
     kept_population_metrics = combined_population_metrics[kept_indices]
 
-    # # Jax doesn't know how many True's are in the kept_mask, so it can't
-    # # validate the size of kept_population.
-    # # I wrote the code so that it's always target_size, but JAX doesn't know that.
-    # # Consequently, the 'mask' is actually indices rather than bools.
-    # kept_mask = simple_cull_indices(combined_population_metrics, target_size=len(population_metrics))
-    # kept_population = combined_population.filter_population(kept_mask)
-    # kept_population_metrics = combined_population_metrics[kept_mask]
-
-    # Note: this approach prevents jitted_population_train from tracking the
-    # population history, which we might want later.
-    # To fix that, we'd want to pass back the combined population and filter.
-    # Or else split the one-step training into split and mutate functions.
-    # jax.lax.scan keeps a history. For a full history, we'd want to keep
-    # the entire history of the population, the entire history of the metrics,
-    # and some rendition of the cull history?
-    # Keep a history of which trial_ids survived each cull, yes.
-    # A history of components should be modest.
-    # 100K steps * 10 components * 4 bytes per float * maybe 15 floats per component
-    # is about 60M bytes, which is trivial.
-    # So, yes, we can track the entire history if we want to. Cool!
-    # For now I'm not going to bother, but it shouldn't be very hard.
+    # TODO: use a faster culling selection than `selection.select` when there's just one metric?
+    # TODO: to support recording the training history, make this function also return
+    # new_population and new_population_metrics?
+    # Or split this function into split and mutate functions, and have the higher-level function
+    # handle it.
     return kept_population, kept_population_metrics, new_key, max_trial_id
 
 
@@ -68,7 +56,7 @@ def jitted_population_train(
     # min_scale: float = 0.01,
     random_key: jax.Array = jax.random.key(12345),
     ) -> Tuple[Population, jnp.ndarray]:  # No need to return the updated random key IMO.
-    """Returns the trained curves and also the associated metric score."""
+    """Returns the trained curves and also the associated metric score. Jitted for performance."""
     scale = max_scale
     population_predictions = model_fn(population.components, xs)
     population_metrics = jnp.stack(metrics_fn(xs, population_predictions), axis=1)
@@ -77,7 +65,6 @@ def jitted_population_train(
 
     ## Putting this for-loop in jitted code isn't working, which is interesting.
     def _train_one_step(_, val):
-        # Nothing in here actually needs the index, but that probably doesn't matter.
         population, population_metrics, scale, random_key, max_trial_id = val
 
         new_population, new_population_metrics, new_key, max_trial_id = population_train_one_step(
@@ -93,6 +80,17 @@ def jitted_population_train(
         scale *= scale_progression
         return new_population, new_population_metrics, scale, new_key, max_trial_id
 
+    # TODO: use a jax.lax.scan instead to remember and return the entire population history?
+    # Maybe lock that behind a flag.
+    # If we return the population and metrics in trial number order, and also include an array
+    # marking what step each population entry survived until, that would enable more advanced
+    # analysis of the training results and the pareto frontier.
+    # A population history should take up a modest amount of memory, since the models are small
+    # and the history size doesn't depend on the amount of data.
+    # 100K trials * ~10 floats per components * ~10 components per model * 4 bytes per float
+    # = 40M bytes, which is modest. We'd also need to save metric scores and trial ids, but those
+    # are also modest. Even a large training run (1M trials, many components) would take a few GB
+    # at most for the history.
     population, population_metrics, scale, random_key, max_trial_id = jax.lax.fori_loop(
         0, num_steps - 1,  # The first batch is the initial population.
         _train_one_step,
@@ -113,10 +111,12 @@ def population_train(
     min_scale: float = 0.01,
     random_key: jax.Array = jax.random.key(12345),
     ) -> Tuple[Population, jnp.ndarray]:
-    """This is a non-jitted wrapper that sets everything up."""
+    """A non-jitted wrapper that sets up and runs a population-based training.
+    
+    This wrapper is probably unnecessary. If it turns out that we don't need any non-jitted
+    training preparation, we can push this logic down into jitted_population_train."""
     scale_progression = (min_scale / max_scale) ** (population_size/num_steps)
-
-    population, random_key = population.fill_population(fill_size=population_size, key=random_key)
+    population, random_key = population.fill(fill_size=population_size, key=random_key)
 
     return jitted_population_train(
         xs=xs,

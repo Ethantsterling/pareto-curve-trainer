@@ -1,46 +1,39 @@
-population_train(
+"""Unit tests for train.py."""
+# pylint: disable=missing-function-docstring
+# pylint: disable=wrong-import-position
+# For most tests, it's quicker and cleaner to lock JAX to CPU.
+import os
+os.environ["JAX_PLATFORMS"] = "cpu"
+import jax
+import jax.numpy as jnp
+from train import population_train
+from example_fixtures import (
+    test_xs, test_population, example_metrics_fn, example_model_fn, NUM_METRICS)
+
+POPULATION_SIZE = 5
+NUM_STEPS = 100
+
+# A tiny training run to ensure everything works.
+learned_population, learned_metrics = population_train(
     xs=test_xs,
     population=test_population,
-    metrics_fn=test_metrics_fn,
-    model_fn=test_model_fn,
-    population_size=5,
-    num_steps=1000,
+    metrics_fn=example_metrics_fn,
+    model_fn=example_model_fn,
+    population_size=POPULATION_SIZE,
+    num_steps=NUM_STEPS,
     random_key=jax.random.key(5),
 )
 
+def test_population_size():
+    assert learned_population.num_trials() == POPULATION_SIZE
 
-def test_xs_and_labels(num_training_points):
-  test_xs = {
-    'curve_x':  jnp.asarray(np.random.uniform(size=num_training_points)),
-    'scalar_x1': jnp.asarray(np.random.uniform(size=num_training_points)),
-    'scalar_x2': jnp.asarray(np.random.uniform(size=num_training_points)),
-    'cat_x': jnp.asarray(np.random.randint(size=num_training_points, low=0, high=3)),
-    'cat_multiplier_x': jnp.asarray(np.random.uniform(size=num_training_points)),
-    }
-  test_labels = test_model_fn(test_target_components, test_xs)
-  return test_xs, test_labels
+def test_population_ids_with_limits():
+    assert jnp.all(learned_population.trial_ids >= 0)
+    assert jnp.all(learned_population.trial_ids <= NUM_STEPS)
 
-test_xs_50k, test_labels_50k = test_xs_and_labels(50_000)
-test_xs_500k, test_labels_500k = test_xs_and_labels(500_000)
-test_xs_5M, test_labels_5M = test_xs_and_labels(5_000_000)
+def test_learned_metrics():
+    assert learned_metrics.shape == (POPULATION_SIZE, NUM_METRICS)
+    assert learned_population.num_trials() == POPULATION_SIZE
 
-final_population, final_scores = population_train(
-    xs=test_xs,
-    population=test_population,
-    metrics_fn=test_metrics_fn,
-    model_fn=test_model_fn,
-    population_size=50,
-    num_steps=100_000,
-    random_key=jax.random.key(8),
-)
-print(final_scores)
-
-# Very close to test_target_components_2
-final_population.filter_population(jnp.array([0])).components
-
-test_target_components_2
-
-final_population.filter_population(jnp.array([1])).components
-# Very close to test_target_components
-
-test_target_components
+def test_learned_something():
+    assert not learned_population == test_population

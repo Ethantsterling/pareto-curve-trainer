@@ -5,10 +5,10 @@ import jax.numpy as jnp
 from component_scalar import Scalar
 from component_catmap import Catmap, InternalCatmap
 from component_pwlcurve import StructPwlcurve, Pwlcurve
-import component_utils as cu
 from component_utils import Mono
+import population
 
-# @jax.jit
+
 def mse_fn(pred: jnp.ndarray, label: jnp.ndarray):
     """Vectorized MSE function."""
     # Predictions should be (#trials, #data).
@@ -109,7 +109,7 @@ test_target_components_2 = {
 
 # TODO: find an elegant way to let the trainable scalar behave more like a scalar.
 # Maybe it could descend from float & NamedTuple both?
-def test_model_fn(components, xs):
+def example_model_fn(components, xs):
     """A simple example of a model_fn excercising each component."""
     curve = components['curve'].eval(xs['curve_x'])
     scalar_1 = components['scalar_1'].value() * xs['scalar_x1']
@@ -121,11 +121,11 @@ def test_model_fn(components, xs):
     return scalar_1 + scalar_2 + cat_x + curve
 
 
-test_labels = test_model_fn(test_target_components, test_xs)
-test_labels_2 = test_model_fn(test_target_components_2, test_xs)
+test_labels = example_model_fn(test_target_components, test_xs)
+test_labels_2 = example_model_fn(test_target_components_2, test_xs)
 # Labels belong in the xs. The metrics are responsible for extracting them.
-test_xs['label'] = test_model_fn(test_target_components, test_xs)
-test_xs['label_2'] = test_model_fn(test_target_components_2, test_xs)
+test_xs['label'] = example_model_fn(test_target_components, test_xs)
+test_xs['label_2'] = example_model_fn(test_target_components_2, test_xs)
 
 test_components = {
     'curve': RandomUnitPWLCurve(num_points=4, key=jax.random.key(2)),
@@ -135,19 +135,23 @@ test_components = {
 }
 
 
-def test_metric_fn(predictions, labels) -> jnp.ndarray:
+def example_metric_fn(predictions, labels) -> jnp.ndarray:
     """A very simple metric function that just emits MSE against the labels."""
     return mse_fn(predictions, labels)
 
 
 # Eventually we'll want the metrics_fn to return a dictionary, I think?
 # So that we can label the metrics for posterity.
-def test_metrics_fn(xs, predictions):
-  # predictions should be (population_size, data_size).
-  # Metrics like mse_fn are built to handle that.
-  mse_1 = mse_fn(predictions, xs['label'])
-  mse_2 = mse_fn(predictions, xs['label_2'])
-  return mse_1, mse_2
+def example_metrics_fn(xs, predictions):
+    """A simple two-metric function for multiobjective training."""
+    # predictions should be (population_size, data_size).
+    # Metrics like mse_fn are built to handle that.
+    mse_1 = mse_fn(predictions, xs['label'])
+    mse_2 = mse_fn(predictions, xs['label_2'])
+    return mse_1, mse_2
 
 
-test_population = population_from_components(test_components)
+NUM_METRICS = 2
+test_population = population.from_components(test_components)
+
+
