@@ -6,7 +6,7 @@ from population import Population
 from selection import select
 
 
-def population_train_one_step(
+def _population_train_one_step(
     *,
     xs: Dict[str, jnp.ndarray],
     population: Population,
@@ -44,7 +44,7 @@ def population_train_one_step(
 
 
 @jax.jit(static_argnames=['metrics_fn', 'model_fn'])
-def jitted_population_train(
+def _jitted_population_train(
     *,
     xs: Dict[str, jnp.ndarray],
     population: Population,  # This must be already filled.
@@ -67,7 +67,7 @@ def jitted_population_train(
     def _train_one_step(_, val):
         population, population_metrics, scale, random_key, max_trial_id = val
 
-        new_population, new_population_metrics, new_key, max_trial_id = population_train_one_step(
+        new_population, new_population_metrics, new_key, max_trial_id = _population_train_one_step(
             xs=xs,
             population=population,
             population_metrics=population_metrics,
@@ -118,7 +118,7 @@ def population_train(
     scale_progression = (min_scale / max_scale) ** (population_size/num_steps)
     population, random_key = population.fill(fill_size=population_size, key=random_key)
 
-    return jitted_population_train(
+    return _jitted_population_train(
         xs=xs,
         population=population,
         metrics_fn=metrics_fn,
