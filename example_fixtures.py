@@ -21,11 +21,6 @@ def mse_fn(pred: jnp.ndarray, label: jnp.ndarray):
     # Else, the metric is one number per trial.
     return -jnp.mean(jnp.square(pred - label), axis=-1)
 
-_pred = jnp.array([(1., 2, 3), (4, 5, 6)])
-_label = jnp.array([1.2, 3.2, 5.2])
-print(mse_fn(_pred[0], _label))
-print(mse_fn(_pred, _label))
-
 
 def RandomUnitStructPWLCurve(num_points, seed):
     """Generates a piecewise-linear curve with random xs and ys in [0, 1]."""
