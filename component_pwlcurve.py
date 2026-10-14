@@ -172,10 +172,11 @@ class Pwlcurve(NamedTuple):
         """Calculates each pwlcurve on each data point."""
         return jax_curves_eval(self.xs, self.ys, data, fx=None)
 
-    def perturbed(self, scale: float, key: jax.Array):
+    def perturbed(self, scale: float, key: jax.Array) -> Self:
         """Randomly shifts each curve coordinate by up to a scaled fraction of its range."""
-        xs, subkey = cu.perturb_array(self.xs, self.xmin, self.xmax, scale, key)
-        ys, subkey = cu.perturb_array(self.ys, self.ymin, self.ymax, scale, subkey)
+        key_x, key_y = jax.random.split(key)
+        xs = cu.perturb_array(self.xs, self.xmin, self.xmax, scale, key_x)
+        ys = cu.perturb_array(self.ys, self.ymin, self.ymax, scale, key_y)
         # TODO: when we add fx transforms, do the perturbing in the transformed space.
         # This likely requires transforming xs & constraints, perturbing, and transforming
         # back, which also requires transforms be reversible.
@@ -184,9 +185,9 @@ class Pwlcurve(NamedTuple):
         xs = jnp.sort(xs)  # Sorts on rightmost axis by default, which is what we want.
         ys = cu.vectorized_conditional_mono_sort(ys, self.mono)
         new_trainable_curve = self._replace(xs=xs, ys=ys)
-        return new_trainable_curve, subkey
+        return new_trainable_curve
 
-    def randomized(self, key: jax.Array):
+    def randomized(self, key: jax.Array) -> Self:
         """Returns itself with randomized curve params."""
         return self.perturbed(scale=1.0, key=key)
 

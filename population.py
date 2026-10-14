@@ -58,10 +58,7 @@ class Population(NamedTuple):
         """
         new_trial_ids = self._new_trial_ids(first_id=first_id, increment_index=increment_index)
         key, *subkeys = jax.random.split(key, len(self.components) + 1)
-        # self.components consists of unlike pieces (different classes) which could
-        # get weird if we try something like vmap.
-        # list comprehensions might be inefficient?
-        new_components = {name: component.perturbed(scale=scale, key=key_i)[0] for
+        new_components = {name: component.perturbed(scale=scale, key=key_i) for
                           (name, component), key_i in zip(self.components.items(), subkeys)}
 
         return Population(trial_ids=new_trial_ids, components=new_components), key
@@ -70,7 +67,7 @@ class Population(NamedTuple):
         """Returns a copy with each component randomized."""
         new_trial_ids = self._new_trial_ids(increment_index=increment_index)
         key, *subkeys = jax.random.split(key, len(self.components) + 1)
-        new_components = {name: component.randomized(key=key_i)[0] for
+        new_components = {name: component.randomized(key=key_i) for
                           (name, component), key_i in zip(self.components.items(), subkeys)}
         return Population(trial_ids=new_trial_ids, components=new_components), key
 
@@ -83,7 +80,7 @@ class Population(NamedTuple):
 
         key, *subkeys = jax.random.split(key, len(self.components) + 1)
         # Extend each component to the desired length and then randomize it.
-        new_components = {name: _extend_component(component, fill_amount).randomized(key=key_i)[0]
+        new_components = {name: _extend_component(component, fill_amount).randomized(key=key_i)
                           for (name, component), key_i in zip(self.components.items(), subkeys)}
         population_extension = Population(trial_ids=new_trial_ids, components=new_components)
         # Only the padded entries (the population_extension) are randomized.

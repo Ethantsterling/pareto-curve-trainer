@@ -32,7 +32,7 @@ def RandomUnitStructPWLCurve(num_points, seed):
 
 def RandomUnitPWLCurve(num_points, key, xmin=0, xmax=1, ymin=0, ymax=1, mono=Mono.NON_MONO):
     """Generates a piecewise-linear curve with random xs and ys."""
-    curve_component, _ = Pwlcurve(
+    curve_component = Pwlcurve(
         xs=jnp.array([jnp.linspace(xmin, xmax, num=num_points)]),
         ys=jnp.array([jnp.linspace(ymin, ymax, num=num_points)]),
         xmin=jnp.array([xmin], dtype=float),
@@ -148,5 +148,3 @@ def example_metrics_fn(xs, predictions):
 
 NUM_METRICS = 2
 test_population = population.from_components(test_components)
-
-

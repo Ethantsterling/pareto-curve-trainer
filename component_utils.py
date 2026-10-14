@@ -134,9 +134,7 @@ def perturb_array(
     `a` should be 0, 1, or 2D, and min&max should be 0 or 1D. If min&max are 1D,
     then `a` must be an array whose first dimension is the same size as min&max.
     """
-    key, subkey = jax.random.split(key)
     dtype = jax.dtypes.result_type(a)
-
     # If a is (N, M) and min&max are (N), then default broadcasting will match
     # the wrong axis unless we expand min and max to (N, 1).
     # In all other cases, the default broadcasting is as intended.
@@ -150,7 +148,7 @@ def perturb_array(
     )
 
     new_a = constrain_by_bouncing(a + shifts, min_val, max_val)
-    return new_a, subkey
+    return new_a
 
 
 def randomize_array(
@@ -164,7 +162,6 @@ def randomize_array(
     `a` should be 0, 1, or 2D, and min&max should be 0 or 1D. If min&max are 1D,
     then `a` must be an array whose first dimension is the same size as min&max.
     """
-    key, subkey = jax.random.split(key)
     # If a is (N, M) and min&max are (N), then default broadcasting will match
     # the wrong axis unless we expand min and max to (N, 1).
     # In all other cases, the default broadcasting is as intended.
@@ -173,4 +170,4 @@ def randomize_array(
         max_val = jnp.expand_dims(max_val, -1)
 
     new_a = jax.random.uniform(key=key, shape=jnp.shape(a), minval=min_val, maxval=max_val)
-    return new_a, subkey
+    return new_a

@@ -18,15 +18,15 @@ class Scalar(NamedTuple):
     smin: jax.typing.ArrayLike
     smax: jax.typing.ArrayLike
 
-    def perturbed(self, scale: float, key: jax.Array) -> tuple[Self, jax.Array]:
+    def perturbed(self, scale: float, key: jax.Array) -> Self:
         """Returns itself shifted by a random step in [-scale, +scale]."""
-        new_s, subkey = cu.perturb_array(self.s, self.smin, self.smax, scale, key)
-        return self._replace(s=new_s), subkey
+        new_s = cu.perturb_array(self.s, self.smin, self.smax, scale, key)
+        return self._replace(s=new_s)
 
-    def randomized(self, key: jax.Array) -> tuple[Self, jax.Array]:
+    def randomized(self, key: jax.Array) -> Self:
         """Returns itself with the scalar randomized."""
-        new_s, subkey = cu.randomize_array(self.s, self.smin, self.smax, key)
-        return self._replace(s=new_s), subkey
+        new_s = cu.randomize_array(self.s, self.smin, self.smax, key)
+        return self._replace(s=new_s)
 
     def value(self) -> jnp.ndarray:
         """Convert to a 1 x n array to support operations against 1D arrays."""

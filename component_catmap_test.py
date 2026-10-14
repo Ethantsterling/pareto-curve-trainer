@@ -56,23 +56,23 @@ def test_catmap_eval():
 
 def test_catmap_perturbed():
     # Perturb with scale=0.0 should change nothing.
-    assert _test_map_1d == _test_map_1d.perturbed(scale=0.0, key=jax.random.key(11))[0]
-    assert _test_map_2d == _test_map_2d.perturbed(scale=0.0, key=jax.random.key(12))[0]
+    assert _test_map_1d == _test_map_1d.perturbed(scale=0.0, key=jax.random.key(11))
+    assert _test_map_2d == _test_map_2d.perturbed(scale=0.0, key=jax.random.key(12))
 
     # Perturbing should break equality but maintain constraint equality.
-    assert _test_map_1d != _test_map_1d.perturbed(scale=0.1, key=jax.random.key(13))[0]
-    assert _test_map_2d != _test_map_2d.perturbed(scale=0.1, key=jax.random.key(14))[0]
-    assert _test_map_1d.constraints_equal(_test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))[0])
-    assert _test_map_2d.constraints_equal(_test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))[0])
+    assert _test_map_1d != _test_map_1d.perturbed(scale=0.1, key=jax.random.key(13))
+    assert _test_map_2d != _test_map_2d.perturbed(scale=0.1, key=jax.random.key(14))
+    assert _test_map_1d.constraints_equal(_test_map_1d.perturbed(scale=0.1, key=jax.random.key(12)))
+    assert _test_map_2d.constraints_equal(_test_map_2d.perturbed(scale=0.1, key=jax.random.key(12)))
 
 
 # Perturbing should obey monotonicity as assigned.
 def _map_is_mono_up(map: jnp.array) -> bool:
-  return (map.map.ys.sort(axis=-1) == map.map.ys).all()
+      return (map.map.ys.sort(axis=-1) == map.map.ys).all()
 def _map_is_mono_down(map: jnp.array) -> bool:
-  return (map.map.ys.sort(axis=-1) == jnp.flip(map.map.ys, axis=-1)).all()
+    return (map.map.ys.sort(axis=-1) == jnp.flip(map.map.ys, axis=-1)).all()
 def _map_is_nonmono(map: jnp.array) -> bool:
-  return not _map_is_mono_up(map) and not _map_is_mono_down(map)
+    return not _map_is_mono_up(map) and not _map_is_mono_down(map)
 
 
 # Validate the monotonicity measures.
@@ -97,38 +97,38 @@ assert _map_is_mono_down(_mono_down_test_map2d)
 
 
 def test_nonmono_1d():
-    nonmono_test_map_1d = _test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))[0]
+    nonmono_test_map_1d = _test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))
     assert _map_is_nonmono(nonmono_test_map_1d)
 
     nonmono_test_map_1d = _test_map_1d._replace(mono=Mono.NON_MONO)
-    nonmono_test_map_1d = nonmono_test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))[0]
+    nonmono_test_map_1d = nonmono_test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))
     assert _map_is_nonmono(nonmono_test_map_1d)
 
 def test_monoup_1d():
     monoup_test_map_1d = Catmap(internal_catmap_1d, ymin=0, ymax=5, mono=Mono.UP)
-    monoup_test_map_1d = monoup_test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))[0]
+    monoup_test_map_1d = monoup_test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))
     assert _map_is_mono_up(monoup_test_map_1d)
 
     monodown_test_map_1d = Catmap(internal_catmap_1d, ymin=0, ymax=5, mono=Mono.DOWN)
-    monodown_test_map_1d = monodown_test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))[0]
+    monodown_test_map_1d = monodown_test_map_1d.perturbed(scale=0.1, key=jax.random.key(12))
     assert _map_is_mono_down(monodown_test_map_1d)
 
 def test_nonmono_2d():
-    nonmono_test_map_2d = _test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))[0]
+    nonmono_test_map_2d = _test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))
     assert _map_is_nonmono(nonmono_test_map_2d)
 
     nonmono_test_map_2d = _test_map_2d._replace(mono=Mono.NON_MONO)
-    nonmono_test_map_2d = nonmono_test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))[0]
+    nonmono_test_map_2d = nonmono_test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))
     assert _map_is_nonmono(nonmono_test_map_2d)
 
 def test_monoup_2d():
     monoup_test_map_2d = _test_map_2d._replace(mono=Mono.UP)
-    monoup_test_map_2d = monoup_test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))[0]
+    monoup_test_map_2d = monoup_test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))
     assert _map_is_mono_up(monoup_test_map_2d)
 
 def test_monodown_2d():
     monodown_test_map_2d = _test_map_2d._replace(mono=Mono.DOWN)
-    monodown_test_map_2d = monodown_test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))[0]
+    monodown_test_map_2d = monodown_test_map_2d.perturbed(scale=0.1, key=jax.random.key(12))
     assert _map_is_mono_down(monodown_test_map_2d)
 
 def test_mixed_2d():
@@ -140,14 +140,12 @@ def test_mixed_2d():
                        mono=jnp.array([Mono.UP, Mono.DOWN, Mono.NON_MONO]),
                        )
 
-    mixed_map = mixed_map.perturbed(scale=0.1, key=jax.random.key(12))[0]
+    mixed_map = mixed_map.perturbed(scale=0.1, key=jax.random.key(12))
     ys = mixed_map.map.ys
 
     # These should obey the specified monotonicity.
     assert jnp.all(ys[0] == jnp.sort(ys[0]))            # Mono.UP
     assert jnp.all(ys[1] == jnp.flip(jnp.sort(ys[1])))  # Mono.DOWN
-    # np.testing.assert_array_equal(ys[0], jnp.sort(ys[0]))            # Mono.UP
-    # np.testing.assert_array_equal(ys[1], jnp.flip(jnp.sort(ys[1])))  # Mono.DOWN
 
     # This should preserve the order of the original ys [-4, -2, -5],
     # since the scale wasn't large enough to change the order.
@@ -155,4 +153,3 @@ def test_mixed_2d():
     assert ys[2][1] > ys[2][2]
     assert ys[2][0] > ys[2][2]
     assert ys[2][1] > ys[2][0] > ys[2][2]
-    

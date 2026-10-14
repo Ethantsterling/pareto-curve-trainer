@@ -37,19 +37,19 @@ class Catmap(NamedTuple):
         """Evaluate each map in the component on each entry in the data."""
         return self.map.eval(data)
 
-    def perturbed(self, scale: float, key: jax.Array) -> tuple[Self, jax.Array]:
+    def perturbed(self, scale: float, key: jax.Array) -> Self:
         """Returns itself shifted by a random step in [-scale, +scale]."""
-        new_ys, subkey = cu.perturb_array(self.map.ys, self.ymin, self.ymax, scale, key)
+        new_ys = cu.perturb_array(self.map.ys, self.ymin, self.ymax, scale, key)
         new_ys = cu.maybe_sorted(new_ys, self.mono)
         new_map = self._replace(map=InternalCatmap(ys=new_ys))
-        return new_map, subkey
+        return new_map
 
-    def randomized(self, key: jax.Array) -> tuple[Self, jax.Array]:
+    def randomized(self, key: jax.Array) -> Self:
         """Returns itself with the scalar randomized."""
-        new_ys, subkey = cu.randomize_array(self.map.ys, self.ymin, self.ymax, key)
+        new_ys = cu.randomize_array(self.map.ys, self.ymin, self.ymax, key)
         new_ys = cu.maybe_sorted(new_ys, self.mono)
         new_map = self._replace(map=InternalCatmap(ys=new_ys))
-        return new_map, subkey
+        return new_map
 
     def merge(self, other) -> Self:
         """We have to control for the weird dimensionality possibilities. """

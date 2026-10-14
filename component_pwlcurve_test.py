@@ -71,8 +71,8 @@ test_pwlcurve = Pwlcurve(
 
 
 def test_perturbed():
-    perturbed_curve_1, _ = test_pwlcurve.perturbed(scale=0.1, key=jax.random.key(12345))
-    perturbed_curve_2, _ = test_pwlcurve.perturbed(scale=0.01, key=jax.random.key(12345))
+    perturbed_curve_1 = test_pwlcurve.perturbed(scale=0.1, key=jax.random.key(12345))
+    perturbed_curve_2 = test_pwlcurve.perturbed(scale=0.01, key=jax.random.key(12345))
     # Perturbing doesn't change the constraints.
     assert perturbed_curve_1.constraints_equal(test_pwlcurve)
     assert perturbed_curve_2.constraints_equal(test_pwlcurve)
@@ -86,7 +86,7 @@ def test_perturbed():
 
 
 def test_randomized():
-    randomized_curve, _ = test_pwlcurve.randomized(key=jax.random.key(12345))
+    randomized_curve = test_pwlcurve.randomized(key=jax.random.key(12345))
     assert randomized_curve.constraints_equal(test_pwlcurve)
     assert not randomized_curve == test_pwlcurve
 
