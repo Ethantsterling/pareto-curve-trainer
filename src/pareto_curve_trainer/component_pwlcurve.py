@@ -170,6 +170,9 @@ class Pwlcurve(NamedTuple):
 
     def eval(self, data: jnp.ndarray) -> jnp.ndarray:
         """Calculates each pwlcurve on each data point."""
+        if jnp.ndim(self.xs) == 1:
+            # This allows us to do eval in a jax map/vmap if we want.
+            return jax_curve_eval(self.xs, self.ys, data, fx=None)
         return jax_curves_eval(self.xs, self.ys, data, fx=None)
 
     def perturbed(self, scale: float, key: jax.Array) -> Self:

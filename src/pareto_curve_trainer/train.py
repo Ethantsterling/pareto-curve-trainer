@@ -6,6 +6,21 @@ from pareto_curve_trainer.population import Population
 from pareto_curve_trainer.selection import select
 
 
+def _one_trial_metrics_fn(xs, model_fn, metrics_fn):
+    """Returns a function to calculate metrics for one row of a population.
+
+    This allows us to jax.lax.map over the population to evaluate one row at a time.
+    This reduces memory costs from O(#population * #xs) to O(#xs), which allows us to use
+    large populations without worrying about exceeding the memory.
+    """
+    def mapped_fn(trial_components):
+        new_predictions = model_fn(trial_components, xs)
+        new_population_metrics = metrics_fn(xs, new_predictions)
+        return new_population_metrics
+
+    return mapped_fn
+
+
 def _population_train_one_step(
     *,
     xs: Dict[str, jnp.ndarray],
@@ -20,9 +35,15 @@ def _population_train_one_step(
     """Grows, mutates, and culls the population."""
     new_population, new_key = population.perturbed(update_scale, random_key, first_id=next_trial_id)
     max_trial_id = new_population.max_trial_id()
-    new_predictions = model_fn(new_population.components, xs)
-    # Combine metrics into (population_size, num_metrics) score array.
-    new_population_metrics = jnp.stack(metrics_fn(xs, new_predictions), axis=1)
+
+    # Run evals one row at a time inside a jax.lax.map.
+    # If we ran .eval directly, it would take O(population_size * data_size) memory,
+    # which can exceed memory limits for larger populations or data.
+    # TODO: benchmark whether .map(batch_size=...) param matters to speed up calculation
+    # in setups where we can afford the memory.
+    one_trial_fn = _one_trial_metrics_fn(xs, model_fn, metrics_fn)
+    new_population_metrics = jax.lax.map(one_trial_fn, new_population.components)
+    new_population_metrics = jnp.stack(new_population_metrics, axis=1)
 
     combined_population = population.stack(new_population)
     combined_population_metrics = jnp.concatenate([population_metrics, new_population_metrics])
@@ -35,7 +56,9 @@ def _population_train_one_step(
     kept_population = combined_population.filter(kept_indices)
     kept_population_metrics = combined_population_metrics[kept_indices]
 
-    # TODO: use a faster culling selection than `selection.select` when there's just one metric?
+    # TODO: profile to see if selection costs a meaningful fraction of the runtime.
+    # Most likely, the model & metric evals dominate the cost.
+    # Also maybe special-case selection when there's just one metric, to save compute.
     # TODO: to support recording the training history, make this function also return
     # new_population and new_population_metrics?
     # Or split this function into split and mutate functions, and have the higher-level function
@@ -53,13 +76,14 @@ def _jitted_population_train(
     num_steps: int = 100,
     max_scale: float = 0.1,
     scale_progression: float = 1.0,
-    # min_scale: float = 0.01,
     random_key: jax.Array = jax.random.key(12345),
     ) -> Tuple[Population, jnp.ndarray]:  # No need to return the updated random key IMO.
     """Returns the trained curves and also the associated metric score. Jitted for performance."""
     scale = max_scale
-    population_predictions = model_fn(population.components, xs)
-    population_metrics = jnp.stack(metrics_fn(xs, population_predictions), axis=1)
+
+    one_trial_fn = _one_trial_metrics_fn(xs, model_fn, metrics_fn)
+    population_metrics = jax.lax.map(one_trial_fn, population.components)
+    population_metrics = jnp.stack(population_metrics, axis=1)
 
     max_trial_id = jnp.max(population.trial_ids)
 

@@ -106,3 +106,11 @@ benchmark_training(
     num_steps=100_000,
     device_type='GPU',
 )
+
+print("\nPopulation size 10_000 to make sure we can do that without exceeding memory:")
+benchmark_training(
+    xs=test_xs_1m,
+    num_steps=100_000,
+    population_size=10_000,
+    device_type='GPU',
+)
