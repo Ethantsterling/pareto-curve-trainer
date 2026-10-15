@@ -4,9 +4,10 @@ GPU should train much faster than CPU.
 Benchmarks will (of course) depend on the speed of the system on which they're run."""
 import time
 import jax
-from train import population_train
-from example_fixtures import (test_target_components, test_target_components_2, test_population,
-                              example_metrics_fn, example_model_fn)
+from pareto_curve_trainer.train import population_train
+from pareto_curve_trainer.example_fixtures import (
+    test_target_components, test_target_components_2, test_population,
+    example_metrics_fn, example_model_fn)
 
 
 def generate_xs(num_training_points, random_seed=102394):

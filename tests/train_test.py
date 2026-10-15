@@ -6,8 +6,8 @@ import os
 os.environ["JAX_PLATFORMS"] = "cpu"
 import jax
 import jax.numpy as jnp
-from train import population_train
-from example_fixtures import (
+from pareto_curve_trainer.train import population_train
+from pareto_curve_trainer.example_fixtures import (
     test_xs, test_population, example_metrics_fn, example_model_fn, NUM_METRICS)
 
 POPULATION_SIZE = 5

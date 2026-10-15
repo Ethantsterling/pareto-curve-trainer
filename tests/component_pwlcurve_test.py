@@ -5,9 +5,9 @@ import os
 os.environ["JAX_PLATFORMS"] = "cpu"
 import jax  
 import jax.numpy as jnp
-import component_utils as cu
-from component_utils import Mono
-from component_pwlcurve import (
+import pareto_curve_trainer.component_utils as cu
+from pareto_curve_trainer.component_utils import Mono
+from pareto_curve_trainer.component_pwlcurve import (
     jax_curve_slopes, jax_curve_eval, jax_curves_slopes, jax_curves_eval, Pwlcurve)
 
 # Ensure jittability in these tests.

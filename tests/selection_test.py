@@ -7,10 +7,10 @@ import os
 os.environ["JAX_PLATFORMS"] = "cpu"
 import jax  
 import jax.numpy as jnp
-import selection
-from selection import (pareto_rank, pareto_rank_with_exclusion, pareto_domination,
-                       _min_masked, crowding_distance, _select_by, _select_by_with_tiebreaker,
-                       select)
+from pareto_curve_trainer import selection
+from pareto_curve_trainer.selection import (
+    pareto_rank, pareto_rank_with_exclusion, pareto_domination,
+    _min_masked, crowding_distance, _select_by, _select_by_with_tiebreaker, select)
 
 # Tests need to ensure that select is jittable.
 select = jax.jit(select, static_argnames='target_size')

@@ -9,7 +9,7 @@ from typing import NamedTuple, Self
 import jax
 import jax.numpy as jnp
 
-import component_utils as cu
+import pareto_curve_trainer.component_utils as cu
 
 
 class Scalar(NamedTuple):

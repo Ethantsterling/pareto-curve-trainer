@@ -7,8 +7,8 @@ import os
 os.environ["JAX_PLATFORMS"] = "cpu"
 import jax
 import jax.numpy as jnp
-import population
-import example_fixtures
+from pareto_curve_trainer import population
+from pareto_curve_trainer import example_fixtures
 
 # Ensure jittability in these tests.
 Population = jax.jit(population.Population)

@@ -4,10 +4,9 @@
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
 os.environ["JAX_PLATFORMS"] = "cpu"
-
 import jax  # pylint: disable=wrong-import-position
 import jax.numpy as jnp  # pylint: disable=wrong-import-position
-from component_scalar import Scalar
+from pareto_curve_trainer.component_scalar import Scalar
 
 # Ensure jittability in these tests.
 Scalar = jax.jit(Scalar)

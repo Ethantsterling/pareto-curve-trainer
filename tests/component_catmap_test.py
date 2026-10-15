@@ -3,12 +3,10 @@
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
 os.environ["JAX_PLATFORMS"] = "cpu"
-
 import jax
 import jax.numpy as jnp
-
-from component_utils import Mono
-from component_catmap import Catmap, InternalCatmap
+from pareto_curve_trainer.component_utils import Mono
+from pareto_curve_trainer.component_catmap import Catmap, InternalCatmap
 
 # Ensure jittability in these tests.
 InternalCatmap = jax.jit(InternalCatmap)

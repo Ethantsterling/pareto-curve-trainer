@@ -5,8 +5,8 @@ import jax.numpy as jnp
 from functools import partial
 from typing import Callable, List, NamedTuple, Self
 
-import component_utils as cu
-from component_utils import Mono
+import pareto_curve_trainer.component_utils as cu
+from pareto_curve_trainer.component_utils import Mono
 
 
 def jax_curve_slopes(

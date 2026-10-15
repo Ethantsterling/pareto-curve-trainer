@@ -2,8 +2,8 @@
 from typing import Dict, Tuple
 import jax
 import jax.numpy as jnp
-from population import Population
-from selection import select
+from pareto_curve_trainer.population import Population
+from pareto_curve_trainer.selection import select
 
 
 def _population_train_one_step(

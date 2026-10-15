@@ -2,11 +2,11 @@
 import jax
 import jax.numpy as jnp
 
-from component_scalar import Scalar
-from component_catmap import Catmap, InternalCatmap
-from component_pwlcurve import StructPwlcurve, Pwlcurve
-from component_utils import Mono
-import population
+from pareto_curve_trainer.component_scalar import Scalar
+from pareto_curve_trainer.component_catmap import Catmap, InternalCatmap
+from pareto_curve_trainer.component_pwlcurve import StructPwlcurve, Pwlcurve
+from pareto_curve_trainer.component_utils import Mono
+from pareto_curve_trainer import population
 
 
 def mse_fn(pred: jnp.ndarray, label: jnp.ndarray):
