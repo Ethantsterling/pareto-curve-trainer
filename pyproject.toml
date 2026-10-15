@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pareto_curve_trainer"
+version = "0.0.1"
+description = "A JAX library for training tiny interpretable models on multiple objectives."
+license = "MIT"
+license-files = ["LICEN[CS]E"]
+authors = [
+  { name="Ethan Sterling", email="ethantsterling@gmail.com" },
+]
+
+readme = "README.md"
+requires-python = ">=3.9"
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "jax>=0.10.0",
+    "jaxlib>=0.10.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+benchmark_training = "pareto_curve_trainer.benchmark"
+
+[project.urls]
+Homepage = "https://github.com/Ethantsterling/pareto-curve-trainer"
+
