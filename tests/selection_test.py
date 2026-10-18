@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from pareto_curve_trainer import selection
 from pareto_curve_trainer.selection import (
     pareto_rank, pareto_rank_with_exclusion, pareto_domination,
-    _min_masked, crowding_distance, _select_by, _select_by_with_tiebreaker, select)
+    _min_masked, crowding_distance, select_by, select)
 
 # Tests need to ensure that select is jittable.
 select = jax.jit(select, static_argnames='target_size')
@@ -173,34 +173,21 @@ def test_crowding_distance_on_random_examples():
 
 
 def test_select_by():
-    assert (_select_by(jnp.array([1,3,3,3,5]), target=3) == jnp.array([0, 1, 1, 1, 2])).all()
-    assert (_select_by(jnp.array([5,1,3,3,3]), target=3) == jnp.array([2, 0, 1, 1, 1])).all()
+    assert (select_by(jnp.array([1,3,3,3,5]), target=3) == jnp.array([0, 1, 1, 1, 2])).all()
+    assert (select_by(jnp.array([5,1,3,3,3]), target=3) == jnp.array([2, 0, 1, 1, 1])).all()
     # If there's no border then we're all 0's and 2's.
-    print(_select_by(jnp.array([5,1,2,4,3]), target=3))
-    assert (_select_by(jnp.array([5,1,2,4,3]), target=3) == jnp.array([2, 0, 0, 2, 2])).all()
-    assert (_select_by(jnp.array([1,3,3,3,5]), target=10) == jnp.array([2, 2, 2, 2, 2])).all()
-    _select_by(jnp.array([3,3,3,3,1]), target=2)
+    print(select_by(jnp.array([5,1,2,4,3]), target=3))
+    assert (select_by(jnp.array([5,1,2,4,3]), target=3) == jnp.array([2, 0, 0, 2, 2])).all()
+    assert (select_by(jnp.array([1,3,3,3,5]), target=10) == jnp.array([2, 2, 2, 2, 2])).all()
+    select_by(jnp.array([3,3,3,3,1]), target=2)
 
-
-def test_select_by_with_tiebreaker():
-    assert (_select_by_with_tiebreaker(jnp.array([1,3,3,3,5]), target=3)
-            == jnp.array([0, 1, 1, 1, 2])).all()
-    assert (_select_by_with_tiebreaker(jnp.array([5,1,3,3,3]), target=3)
-            == jnp.array([2, 0, 1, 1, 1])).all()
-    # If there's no border then we're all 0's and 2's.
-    assert (_select_by_with_tiebreaker(jnp.array([5,1,2,4,3]), target=3)
-            == jnp.array([2, 0, 0, 2, 2])).all()
-    assert (_select_by_with_tiebreaker(jnp.array([1,3,3,3,5]), target=10)
-            == jnp.array([2, 2, 2, 2, 2])).all()
-    _select_by_with_tiebreaker(jnp.array([3,3,3,3,1]), target=2)
-
-    assert (_select_by_with_tiebreaker(
+    assert (select_by(
         jnp.array([1,3,3,3,5]),
         target=3,
         tiebreaker=jnp.array([50, 5, 4, 4, 0]),
         ) == jnp.array([0, 2, 1, 1, 2])).all()
 
-    assert (_select_by_with_tiebreaker(
+    assert (select_by(
         jnp.array([1,3,3,3,5]),
         target=3,
         tiebreaker=jnp.array([50, 5, 4, 3, 0]),

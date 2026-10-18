@@ -58,7 +58,7 @@ def pareto_rank(ys: jnp.ndarray) -> jnp.ndarray:
       ys: (number of population) x (number of metrics) array.
 
     Returns:
-      (number of population) integer array.
+      (number of population,) integer array.
     """
     if ys.shape[0] == 0:
         return jnp.zeros([0])
@@ -74,14 +74,14 @@ def pareto_rank_with_exclusion(ys: jnp.ndarray, exclusion_mask) -> jnp.ndarray:
       ys: (number of population) x (number of metrics) array.
 
     Returns:
-      (number of population) integer array.
+      (number of population,) integer array.
     """
     if ys.shape[0] == 0:
         return jnp.zeros([0])
     dominated = pareto_domination(ys)
     empty_row = jnp.zeros(ys.shape[0], dtype=bool)
-    dominated = jnp.where(exclusion_mask.reshape((-1, 1)), dominated, empty_row)
     # Overwrite domination so those excluded don't count.
+    dominated = jnp.where(exclusion_mask.reshape((-1, 1)), dominated, empty_row)
     return jnp.sum(dominated, axis=0)
 
 
@@ -103,11 +103,13 @@ def crowding_distance(
     exclusion_mask: jnp.ndarray | None = None,
     tiebreaker_random_key: jnp.ndarray | None = jax.random.key(12345),
     extra_tiebreakers: Sequence[jnp.ndarray] = tuple()) -> jnp.ndarray:
-    """Crowding distance.
+    """Crowding distance to reward points that are further awy from others.
 
-    Reference:
+    Adapted from Vizier's NSGA2 crowding distance, which references
     https://medium.com/@rossleecooloh/optimization-algorithm-nsga-ii-and-python-package-deap-fca0be6b2ffc
-    except that the lower boundary does not get infinity crowding score.
+    This version is written in jittable JAX, which requires us to know array size ahead of time.
+    We get around that limitation with the `exclusion_mask` parameter, which indicates which points
+    we're actually using to compute crowding distance.
 
     Args:
       ys: (size of population) x (number of metrics) array.
@@ -132,17 +134,13 @@ def crowding_distance(
     # set ys[exclusion_mask] to the minimum non-masked values of each column,
     # so that they don't interfere with the crowding score calculation for the
     # other rows.
-    # ys = jnp.where(exclusion_mask.reshape((-1, 1)), ys, ys.min(axis=0))
     ys = _min_masked(ys, mask=exclusion_mask)
 
-    # Use a random number to break ties. But the same random number is used for
-    # all metrics.
+    # Use a random number to break ties, with the same number for each metric.
     tiebreakers = list(extra_tiebreakers)
     if tiebreaker_random_key is not None:
         random_tiebreaker = jax.random.normal(key=tiebreaker_random_key, shape=ys.shape[0])
         tiebreakers += [random_tiebreaker]
-      # Random tiebreaker interferes with the masking.
-      # tiebreakers = list(extra_tiebreakers) + [random_tiebreaker]
 
     # m-th metric.
     for m in range(ys.shape[1]):
@@ -160,15 +158,10 @@ def crowding_distance(
         # always equals the minimum of the non-excluded elements
         yrange = yy[sid[-1]] - yy[sid[0]] + jnp.finfo(jnp.float32).eps
 
-        # Lower boundary is assigned a one-sided score and does not automatically
-        # get infinity. This is different from the paper. The lower boundary means
-        # it's dominated by all other points in one dimension. There's no reason to
-        # favor it over other points.
+        # Lower boundary receives a one-sided score.
         at0_increase = (yy[sid[1]] - yy[sid[0]]) / yrange
         scores = scores.at[sid[0]].add(at0_increase)
-        # Upper boundary is assigned infinity. This point will survive anyways
-        # because it's pareto-optimal. But in case there are ties, it's useful to
-        # make only one of them stand out.
+        # Upper boundary is assigned infinity.
         scores = scores.at[sid[-1]].add(jnp.inf)
 
         mid_score = (yy[sid[2:]] - yy[sid[:-2]]) / yrange
@@ -184,113 +177,40 @@ class Select(IntEnum):
     INCLUDE = 2
 
 
-# Derivative of Vizier's nsga2, which uses numpy rather than JAX.
-## To allow sequential selections, maybe _select_by should receive a selection
-## array and then only perform selection logic on the border?
-## That way we can use the true ys and the true target to each selection.
-## Note that if we pass the true target (instead of the remaining target) then
-## we can afford to set target as dynamic, because it will rarely change.
-## I believe that allows for the simpler O(N) partition-based solution.
-## How to enforce inputted INCLUDE/EXCLUDE? Either stick selections and ys
-## together into a 2D array and do partitioning on the 2D row, sorting first by
-## selection and second by y, or else override ys by setting ys with EXCLUDE
-## to -inf and ys with INCLUDE to +inf. That assumes that the real ys are never
-## -inf or +inf, which should be true but isn't guaranteed, so I'd prefer not to
-## rely on it.
-# @jax.jit
-def _select_by(ys: jnp.ndarray,
-               target: int,
-               preselection: None | jnp.ndarray = None) -> Tuple[jnp.ndarray, jnp.ndarray]:
-    """Returns a boolean index array for the top `target` elements of ys.
-
-    Args:
-      ys: Array of shape [M]. Entries are expected to have a small set of unique
-        values.
-      target: Count to return.
-
-    Returns:
-      An output array of Select int enums
-      * `ys[output == Select.INCLUDE]` has length less than or equal to `target`.
-          They are within top `target`.
-      * `ys[output == Select.INCLUDE | output == Select.BORDER]` has length
-          greater than or equal to `target`.
-      * `ys[output == Select.BORDER]` have all-identical entries. Callers should
-          break ties among them.
-      * `ys[output == Select.EXCLUDE]` should be discarded.
-    """
-    # if len(ys) <= target:
-    #   return jnp.repeat(Select.INCLUDE, len(ys))
-    if preselection is None:
-        preselection = jnp.ones(len(ys))
-
-    ## O(nlogn) solution.
-    unique, counts = jnp.unique(ys, return_counts=True, size=len(ys) )
-    unique, counts = unique[::-1], counts[::-1]  # We want descending order.
-    counts_cumsum = jnp.cumsum(counts)
-    cutoffidx = jnp.argmax(counts_cumsum >= target)
-    cutoffnumber = unique[cutoffidx]
-    # We have a border separate from includes iff we didn't overshoot `target`.
-    include_whole_border = counts_cumsum[cutoffidx] <= target
-
-    # counts_cumsum[cutoffidx] == target --> everything is included, no border.
-    # counts_cumsum[cutoffidx] > target --> we have a border.
-
-    ## Problem with using partitioned: we'd have to re-jit for different targets.
-    ## That's... probably fine, though? It's not as if we're going to be constantly
-    ## changing the target number.
-    ## O(n) solution, requires re-jitting.
-    # partitioned = jnp.partition(ys, -target)
-    # cutoffnumber = partitioned[-target]
-    # include_whole_border = jnp.sum(ys >= cutoffnumber) <= target
-
-
-    include = (ys > cutoffnumber).astype(int)
-    border = (ys == cutoffnumber).astype(int)
-    # Includes are always tagged as 2.
-    included_tag = 2 * include
-    # The border is tagged as 1 unless we include_whole_border, then they're 2.
-    border_tag = border * (include_whole_border + 1)
-    return included_tag + border_tag
-
-
-# We'll have to make target dynamic, but that's fine.
-# It just means rejitting every time the target size changes.
-def _select_by_with_tiebreaker(
+def select_by(
     ys: jnp.ndarray,
     target: int,
     tiebreaker: None | jnp.ndarray = None) -> Tuple[jnp.ndarray, jnp.ndarray]:
-    """Returns a boolean index array for the top `target` elements of ys.
+    """Returns a trinary mask identifying the top `target` elements of ys.
+    
+    Bins inputs into the three categories of a Select enum (EXCLUDE/BORDER/INCLUDE).
+    We rank by ys (higher is better) and break ties by tiebreaker.
+    INCLUDE indicates entries that unambiguously rank in the top target entires.
+    BORDER indicates tied entries that could rank in the top target but can't all fit.
+    EXCLUDE indicates entries that definitely do not rank in the top target.
 
     Args:
-      ys: Array of shape [M] that order selection. Higher is better.
+      ys: Array of shape (#points, #metrics) that order selection. Higher is better.
       target: Count to tag as INCLUDE, unless there's a BORDER.
-      tiebreaker: Array of shape [M] that breaks ties in selection when
+      tiebreaker: Array of shape (#points,) that breaks ties in selection when
         ys[i] == ys[j]. Higher is better.
-      Entries with a higher value take precedence
-        over entries with a lower value. When there's a tie, ys prevail.. Entries are 0/1/2 Select enums, indicating
-        inputs in y that are locked to EXCLUDE, are on the BORDER, or locked to
-        EXCLUDE. Our output should always favor INCLUDE > BORDER > EXCLUDE.
-
-
+  
     Returns:
-      An output array of shape [M] of Select int enums.
+      An output array of shape (#metrics,) of Select int enums.
       * `output == Select.INCLUDE` for <= `target` values, indicating they're
         definitely selected.
       * `output == Select.INCLUDE | output == Select.BORDER` for >= `target` values.
       * `output == Select.BORDER` are identical in both ys and tiebreaker to the
         target-th best entry, indicating a tie between at least two entries.
         If the caller needs precisely `target` top values, the caller must break
-        the tie in
-      * `output == Select.EXCLUDE` should be discarded. They
+        the tie subsequently.
+      * `output == Select.EXCLUDE` should be discarded.
     """
-    # print(f'_select_by {target} on {ys} with tiebreaker {tiebreaker}')
     if len(ys) <= target:
         return jnp.repeat(Select.INCLUDE, len(ys))
     if tiebreaker is None:
         tiebreaker = jnp.ones(len(ys))
 
-    ## Is there a way to rewrite this to use an arbitrary sequence of deciders?
-    ## That would feel more general.
     # ys take precedence over tiebreaker.
     sort_index = jnp.lexsort([tiebreaker, ys])
     cutoffindex = sort_index[-target]
@@ -353,7 +273,7 @@ def select(scores: jnp.ndarray,   # 2D array of metric x point
         # Everything is on the 'border'.
         selection = jnp.ones(len(scores))
     else:
-        selection = _select_by(priority_score, target=target_size)
+        selection = select_by(priority_score, target=target_size)
 
     # Calculate each point's pareto domination (the number of other points that
     # dominate it). Ignore domination by rows we've already
@@ -366,7 +286,7 @@ def select(scores: jnp.ndarray,   # 2D array of metric x point
 
     # Select all INCLUDE and select the least-dominated points from BORDER.
     # Use -pareto_ranks so that less-dominated points rank higher.
-    selection = _select_by_with_tiebreaker(
+    selection = select_by(
         selection, target=target_size, tiebreaker=-pareto_ranks
     )
 
@@ -378,7 +298,7 @@ def select(scores: jnp.ndarray,   # 2D array of metric x point
         exclusion_mask=selection != Select.EXCLUDE,
         extra_tiebreakers=[pareto_ranks],
     )
-    selection = _select_by_with_tiebreaker(
+    selection = select_by(
         selection, target=target_size, tiebreaker=distance,
     )
     # The crowding_distance should settle the border, so selection should now
