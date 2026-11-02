@@ -69,9 +69,7 @@ def normalize_weights_to_max_one(
         to 1.0 for the perfect ordering and less than 1.0 for any less-perfect ordering.
     """
     ideal_order, _ = ideal_and_worst_orders(labels, groups)
-    print(ideal_order)
     max_score = jnp.average(labels[ideal_order] * weights)
-    print(max_score)
     return weights / max_score
 
 
@@ -102,7 +100,7 @@ def normalize_weights_to_max_one_min_zero(
     average_label = jnp.average(labels)
     weights = (weights - min_score / average_label) / (max_score - min_score)
     return weights
-    
+
 
 def normalized_group_weights_to_max_one(
         weights: jnp.ndarray,
@@ -122,22 +120,16 @@ def normalized_group_weights_to_max_one(
     """
     ideal_order, worst_order = ideal_and_worst_orders(labels, groups)
     ideal_order_labels = labels[ideal_order]
-    worst_order_labels = labels[worst_order]
     order_groups = groups[ideal_order]  # Depends only on groups, not on labels.
-    
     # For normalization, we need to measure the best and worst scores.
     ideal_order_weighted_labels = weights * ideal_order_labels
-
     # Normalize each group to a minimum possible score of 0 and a maximum of 1.
     group_sizes = streak_lengths(order_groups)
-    
     # segment_ids is required to index from 0.
     segment_ids = jnp.repeat(jnp.arange(len(group_sizes)), group_sizes)
-    
     group_max_score = jax.ops.segment_sum(ideal_order_weighted_labels, segment_ids) / group_sizes
     # Fill the group scores back out to the entire group.
     group_max_score = jnp.repeat(group_max_score, group_sizes)
-    
     new_weights = weights / group_max_score
     # Skip normalization for groups whose normalization would require dividing by 0.
     # We can't normalize those this way and we shouldn't try.
@@ -182,7 +174,7 @@ def normalized_group_weights_to_max_one_min_zero(
     group_label_average = jnp.repeat(group_label_average, group_sizes)
     # I need the average label within each group.
     shifted_weights = (weights - group_min_score / group_label_average)
-    normalized_weights = weights / (group_max_score - group_min_score)
+    normalized_weights = shifted_weights / (group_max_score - group_min_score)
 
     # Normalization breaks when group_max_score == group_min_score or group_label_average == 0.
     # Those groups can't be normalized to min=0 max=1. It's not clear what to do for them.
