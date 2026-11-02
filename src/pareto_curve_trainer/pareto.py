@@ -285,6 +285,11 @@ def prefix_dominated_hypervolume(pareto_points: jnp.ndarray,
     (2) p <= at least one pareto point in all axes.
     Note that this can be zero if none of pareto_points dominate the origin.
 
+    This is based on Vizier's algorithm for approximate dominated hypervolume, as described in
+    Section 3, Lemma 5 of https://arxiv.org/pdf/2006.04655.pdf. Vizier has their own JAX
+    implementation. The implementation here differs mainly in its handling of batching, and in
+    the choice to normalize metrics.
+
     Args:
         pareto_points: 2D array of (#points, #metrics). For efficiency, these points
         should all be prefix-pareto optimal. (This function won't check.)

@@ -1,3 +1,4 @@
+"""Utilities for components."""
 from enum import IntEnum
 import os
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".20"
