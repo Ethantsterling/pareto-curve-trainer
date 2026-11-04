@@ -59,15 +59,15 @@ def normalize_weights_to_unit(weights: jnp.ndarray) -> jnp.ndarray:
 
 
 def normalize_group_weights_to_unit(weights: jnp.ndarray, groups: jnp.ndarray) -> jnp.ndarray:
-    """Weights that average to 1 within each group."""
+    """Weights that average to 1 and also equalize each group's total weight."""
     groups = groups.sort()
     group_sizes = streak_lengths(groups)
 
     # segment_ids is required to index from 0.
     segment_ids = jnp.repeat(jnp.arange(len(group_sizes)), group_sizes)
-    per_group_average_weight = jax.ops.segment_sum(weights, segment_ids) / group_sizes
+    per_group_average_weight = jax.ops.segment_sum(weights, segment_ids)
     per_group_average_weight = jnp.repeat(per_group_average_weight, group_sizes)
-    group_unit_weights = weights / per_group_average_weight
+    group_unit_weights = weights / per_group_average_weight / len(group_sizes) * len(groups)
     # No group should have zero average weights, but if for some reason they do, normalization
     # breaks and we fall back to leaving the weights unchanged.
     return jnp.where(jnp.isfinite(group_unit_weights), group_unit_weights, weights)
@@ -137,6 +137,7 @@ def normalize_group_weights_to_max_one(
             weights.
         labels: The float label for each row.
         groups: The int group tag for each row, corresponding to the label.
+    
     Returns:
         Post-normalization weights.
     """
@@ -149,13 +150,14 @@ def normalize_group_weights_to_max_one(
     group_sizes = streak_lengths(order_groups)
     # segment_ids is required to index from 0.
     segment_ids = jnp.repeat(jnp.arange(len(group_sizes)), group_sizes)
-    group_max_score = jax.ops.segment_sum(ideal_order_weighted_labels, segment_ids) / group_sizes
+    group_max_score = jax.ops.segment_sum(ideal_order_weighted_labels, segment_ids)
     # Fill the group scores back out to the entire group.
     group_max_score = jnp.repeat(group_max_score, group_sizes)
-    new_weights = weights / group_max_score
+    new_weights = weights * len(groups) / len(group_sizes)
+    normalized_weights = new_weights / group_max_score
     # Skip normalization for groups whose normalization would require dividing by 0.
     # We can't normalize those this way and we shouldn't try.
-    return jnp.where(jnp.isfinite(new_weights), new_weights, weights)
+    return jnp.where(jnp.isfinite(normalized_weights), normalized_weights, weights)
 
 
 def normalize_group_weights_to_max_one_min_zero(
@@ -187,16 +189,17 @@ def normalize_group_weights_to_max_one_min_zero(
     group_sizes = streak_lengths(order_groups)
     # segment_ids is required to index from 0.
     segment_ids = jnp.repeat(jnp.arange(len(group_sizes)), group_sizes)
-    group_max_score = jax.ops.segment_sum(ideal_order_weighted_labels, segment_ids) / group_sizes
-    group_min_score = jax.ops.segment_sum(worst_order_weighted_labels, segment_ids) / group_sizes
-    group_label_average = jax.ops.segment_sum(ideal_order_labels, segment_ids) / group_sizes
+    group_max_score = jax.ops.segment_sum(ideal_order_weighted_labels, segment_ids)
+    group_min_score = jax.ops.segment_sum(worst_order_weighted_labels, segment_ids)
+    group_label_average = jax.ops.segment_sum(ideal_order_labels, segment_ids)
     # Fill the group scores back out to the entire group.
     group_max_score = jnp.repeat(group_max_score, group_sizes)
     group_min_score = jnp.repeat(group_min_score, group_sizes)
     group_label_average = jnp.repeat(group_label_average, group_sizes)
     # I need the average label within each group.
-    shifted_weights = (weights - group_min_score / group_label_average)
+    shifted_weights = weights - group_min_score / group_label_average
     normalized_weights = shifted_weights / (group_max_score - group_min_score)
+    normalized_weights = normalized_weights * len(groups) / len(group_sizes)
 
     # Normalization breaks when group_max_score == group_min_score or group_label_average == 0.
     # Those groups can't be normalized to min=0 max=1. It's not clear what to do for them.
@@ -224,6 +227,8 @@ def order_metric_weights(rank_to_weight: jnp.ndarray | Callable,
                 `rank_to_weight` can either be a function or an array. If a function, it must map
                 every position index to a weight float. If an array, any position index that
                 exceeds the array's bounds will be mapped to a weight of 0.
+                This should normally be a monotonically decreasing function, such that a
+                higher rank index (i.e. a worse rank) always corresponds to a lower weight.
             labels: 1D floats. Ground truth for each row of data.
             groups: Optional 1D ints, used for group metrics. Rows i and j are in the same group
                 iff groups[i] == groups[j]. `groups` must be ordered to match labels, so that

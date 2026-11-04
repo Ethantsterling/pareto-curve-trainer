@@ -121,8 +121,6 @@ def test_normalize_group_weights_to_max_one_min_zero():
     # Lexsort --> groups [1,1,2,2,3,3]
     #             labels [1,0,4,2,5,3] (for the ideal label order).
     one_weights = mu.normalize_group_weights_to_max_one_min_zero(weights, labels, groups=groups)
-    print(one_weights)
-
     # Per-group max scores are currently .5, 1.6, and 0.5.
     # Per-group min scores are currently .4, 1.4, and 0.3.
     # We need to reduce the group weights by .4/.5, 1.4/3, and .3/4.
@@ -135,11 +133,6 @@ def test_normalize_group_weights_to_max_one_min_zero():
 
     min_score = eval_order_metric(one_weights, labels[jnp.lexsort([labels, groups])])
     max_score = eval_order_metric(one_weights, labels[jnp.lexsort([-labels, groups])])
-    print("normalized scores", min_score, max_score)
-    print("non-normalized scores",
-          eval_order_metric(weights, labels[jnp.lexsort([labels, groups])]),
-          eval_order_metric(weights, labels[jnp.lexsort([-labels, groups])]))
-
     assert jnp.isclose(max_score, 1.0)
     assert jnp.isclose(min_score, 0.0, atol=1e-5)
 
@@ -238,9 +231,15 @@ def test_order_metric_weights_with_groups():
             rank_to_weight, labels, groups, normalize=mu.Normalization.GROUP_UNIT_WEIGHTS)
     unit_normalized_weights_from_arr = mu.order_metric_weights(
         weights_arr, labels, groups, normalize=mu.Normalization.GROUP_UNIT_WEIGHTS)
-    group_average_weight = jnp.array([1.5/2, 1.5/2, 1.5/2, 1.5/2, 1.75/3, 1.75/3, 1.75/3])
+
+    # Each group's weight sum should be identical under this normalization.
     assert jnp.allclose(unit_normalized_weights_from_fn, unit_normalized_weights_from_arr)
-    assert jnp.allclose(unit_normalized_weights_from_fn, full_expected_weights / group_average_weight)
+    norm_weights = unit_normalized_weights_from_fn
+    assert (norm_weights[0] + norm_weights[1] ==
+            norm_weights[2] + norm_weights[3] ==
+            norm_weights[4] + norm_weights[5] + norm_weights[6])
+    assert jnp.isclose(jnp.average(norm_weights), 1)
+    assert jnp.allclose(unit_normalized_weights_from_fn, unit_normalized_weights_from_arr)
 
     weights_from_fn = mu.order_metric_weights(
         rank_to_weight, labels, groups, normalize=mu.Normalization.MAX_ONE)
