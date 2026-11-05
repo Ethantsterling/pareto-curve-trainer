@@ -8,7 +8,8 @@ import jax
 import jax.numpy as jnp
 from pareto_curve_trainer.train import population_train
 from pareto_curve_trainer.example_fixtures import (
-    test_xs, test_population, example_metrics_fn, example_model_fn, NUM_METRICS)
+    test_xs, test_population, example_metrics_fn, example_model_fn, NUM_METRICS,
+    make_example_ranked_metrics_fn)
 
 POPULATION_SIZE = 5
 NUM_STEPS = 100
@@ -37,3 +38,27 @@ def test_learned_metrics():
 
 def test_learned_something():
     assert not learned_population == test_population
+
+
+example_ranked_metrics_fn = make_example_ranked_metrics_fn(test_xs)
+
+
+# A tiny training with a ranking metric.
+learned_population_onranked, learned_metrics_onranked = population_train(
+    xs=test_xs,
+    population=test_population,
+    metrics_fn=example_ranked_metrics_fn,
+    model_fn=example_model_fn,
+    population_size=POPULATION_SIZE,
+    num_steps=NUM_STEPS,
+    random_key=jax.random.key(5),
+)
+
+
+def test_ranking_learned_metrics():
+    assert learned_metrics_onranked.shape == (POPULATION_SIZE, NUM_METRICS)
+    assert learned_population_onranked.num_trials() == POPULATION_SIZE
+
+
+def test_ranking_learned_something():
+    assert not learned_population_onranked == test_population

@@ -1,5 +1,6 @@
 """Multiobjective population training."""
-from typing import Dict, Tuple
+import inspect
+from typing import Dict, NamedTuple, Tuple
 import jax
 import jax.numpy as jnp
 from pareto_curve_trainer.population import Population
@@ -20,6 +21,12 @@ def _one_trial_metrics_fn(xs, model_fn, metrics_fn):
 
     return mapped_fn
 
+
+def _metrics_fn_as_pytree(metrics_fn):
+    class _WrappedMetric(NamedTuple):
+        def __call__(self, xs, predictions):
+            return metrics_fn(xs, predictions)
+    return _WrappedMetric()
 
 def _population_train_one_step(
     *,
@@ -66,12 +73,13 @@ def _population_train_one_step(
     return kept_population, kept_population_metrics, new_key, max_trial_id
 
 
-@jax.jit(static_argnames=['metrics_fn', 'model_fn'])
+# @jax.jit(static_argnames=['metrics_fn', 'model_fn'])
+@jax.jit(static_argnames=['model_fn'])
 def _jitted_population_train(
     *,
     xs: Dict[str, jnp.ndarray],
     population: Population,  # This must be already filled.
-    metrics_fn, #: Metric function that knows the labels.
+    metrics_fn, #: Metrics callable that knows where in xs to find the labels.
     model_fn,
     num_steps: int = 100,
     max_scale: float = 0.1,
@@ -127,7 +135,7 @@ def population_train(
     *,
     xs: Dict[str, jnp.ndarray],
     population: Population,
-    metrics_fn, #: Metric,
+    metrics_fn,
     model_fn,
     population_size: int = 50,
     num_steps: int = 10_000,
@@ -135,10 +143,9 @@ def population_train(
     min_scale: float = 0.01,
     random_key: jax.Array = jax.random.key(12345),
     ) -> Tuple[Population, jnp.ndarray]:
-    """A non-jitted wrapper that sets up and runs a population-based training.
-    
-    This wrapper is probably unnecessary. If it turns out that we don't need any non-jitted
-    training preparation, we can push this logic down into jitted_population_train."""
+    """A non-jitted wrapper that sets up and runs a population-based training."""
+    if inspect.isfunction(metrics_fn):
+        metrics_fn = _metrics_fn_as_pytree(metrics_fn)
     scale_progression = (min_scale / max_scale) ** (population_size/num_steps)
     population, random_key = population.fill(fill_size=population_size, key=random_key)
 
