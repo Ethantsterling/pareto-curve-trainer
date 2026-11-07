@@ -22,6 +22,7 @@ classifiers = [
 dependencies = [
     "jax>=0.10.0",
     "jaxlib>=0.10.0",
+    "altair",
 ]
 
 [tool.pytest.ini_options]
