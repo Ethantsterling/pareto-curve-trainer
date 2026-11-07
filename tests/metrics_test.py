@@ -268,6 +268,20 @@ def test_anchored_ndcg_metric_on_groups():
     assert jnp.isclose(ndcg_score, anchored_ndcg_score, atol=1e-5)
 
 
+def test_anchored_linear_metric():
+    labels = jax.random.uniform(shape=(100,), key=jax.random.key(1))
+    groups = jax.random.randint(shape=(100,), minval=1, maxval=4, key=jax.random.key(2))
+    scores = jax.random.uniform(shape=(100,), key=jax.random.key(3)) + .2 * labels
+
+    # For now just test that it runs.
+    anchored_linear = metrics.anchored_linear_metric(labels, groups)
+    anchored_linear.eval(scores)
+    anchored_linear = metrics.anchored_linear_metric(labels)
+    anchored_linear.eval(scores)
+    anchored_linear = metrics.anchored_linear_metric(labels, groups, depth=5)
+    anchored_linear.eval(scores)
+
+
 def test_group_rank():
     labels = jax.random.normal(shape=1000, key=jax.random.key(50))
     groups = jax.random.randint(shape=1000, minval=0, maxval=4, key=jax.random.key(51))

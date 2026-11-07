@@ -169,23 +169,6 @@ def anchor_order_metric(rank_to_weight: jnp.ndarray | Callable,
 # separate array of group IDs corresponding to each row.
 # Normalization also becomes more involved, because some common group order metrics (e.g. nDCG)
 # normalize within groups.
-def anchored_ndcg_metric(
-        labels: jnp.ndarray,
-        groups: jnp.ndarray,
-        depth: None | int=None) -> AnchoredOrderMetric:
-    """Normalized Distributed Cumulative Gain metric."""
-    def rank_to_weight(rank):
-        if depth is None:
-            return 1 / jnp.log2(rank + 2)
-        return jnp.where(rank < depth, 1 / jnp.log2(rank + 2), 0)
-
-    return anchor_order_metric(
-        rank_to_weight,
-        labels,
-        groups,
-        normalize=metrics_util.Normalization.GROUP_MAX_ONE)
-
-
 def group_rank(predictions, groups):
     """Rank primarily by groups (ascending) and secondary by predictions (descending).
     
@@ -195,3 +178,40 @@ def group_rank(predictions, groups):
     pred_order = jnp.argsort(predictions, descending=True)
     group_pred_order = jnp.argsort(groups[pred_order])
     return pred_order[group_pred_order]
+
+
+def anchored_ndcg_metric(
+        labels: jnp.ndarray,
+        groups: None | jnp.ndarray,
+        depth: None | int=None) -> AnchoredOrderMetric:
+    """Normalized Distributed Cumulative Gain metric."""
+    def rank_to_weight(rank):
+        if depth is None:
+            return 1 / jnp.log2(rank + 2)
+        return jnp.where(rank < depth, 1 / jnp.log2(rank + 2), 0)
+
+    return anchor_order_metric(
+        rank_to_weight,
+        labels=labels,
+        groups=groups,
+        normalize=metrics_util.Normalization.GROUP_MAX_ONE)
+
+
+def anchored_linear_metric(
+    labels: jnp.ndarray,
+    groups: None | jnp.ndarray=None,
+    depth: None | int=None,
+    normalize: metrics_util.Normalization=metrics_util.Normalization.GROUP_UNIT_WEIGHTS,
+    ) -> AnchoredOrderMetric:
+    """A metric that drops off linearly by position."""
+    if depth is None:
+        depth = len(labels)
+
+    def rank_to_weight(rank):
+        return jnp.where(rank < depth, 1 - rank * (1 / depth), 0)
+
+    return anchor_order_metric(
+        rank_to_weight,
+        labels=labels,
+        groups=groups,
+        normalize=normalize)
