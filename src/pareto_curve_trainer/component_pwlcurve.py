@@ -156,7 +156,6 @@ class StructPwlcurve(NamedTuple):
         return f"PWLCurve({points}, fx={self.fx.__name__})"
 
 
-# @jax.jit
 class Pwlcurve(NamedTuple):
     """A vectorized, trainable component representing variants of a pwlcurve."""
     xs: jnp.ndarray    # 2D num_curves x curve_size floats
@@ -228,3 +227,59 @@ class Pwlcurve(NamedTuple):
         return (jnp.all(self.xs == other.xs) &
                 jnp.all(self.ys == other.ys) &
                 self.constraints_equal(other))
+
+
+def pwlcurve_from_data(xs: jnp.ndarray,
+                       num_segments: int,
+                       ymin: int=0,
+                       ymax: int=1,
+                       mono=Mono.NON_MONO,
+                       x_clip_frac: float|None=None):
+    """Initialize a pwlcurve that infers xmin and xmax from the data.
+    
+    TODO: if/when input transforms are incorporated, infer a good transform from
+    the xs. Use some kind of uniformity/distribution.
+    
+    Complication: x-outliers are a problem for our algorithms, both because linear
+    segments don't do well with outliers and because 
+    
+    x_clip_frac optionally trims the extremes to avoid skewing by outliers."""
+    xs = jnp.array(xs)
+    if x_clip_frac:
+        assert 0 <= x_clip_frac < 0.5
+        xs = jnp.sort(xs)
+        final_index = len(xs) - 1
+        min_i = int(x_clip_frac * final_index)
+        max_i = final_index - min_i
+        xmin = xs[min_i]
+        xmax = xs[max_i]
+    else:
+        xmin = jnp.min(xs)
+        xmax = jnp.max(xs)
+
+    # For proper stacking, these need to be 1D arrays even if there's just one element.
+    # In the future these constraint fields should probably be nonstacking singletons, perhaps
+    # by using equinox.Module? In theory it's interesting to allow the components to start with
+    # multiple variations of the constraint fields, but I struggle to think of a situation where
+    # we would actually want that.
+    xmin = jnp.reshape(xmin, (1,))
+    xmax = jnp.reshape(xmax, (1,))
+    ymin = jnp.reshape(ymin, (1,))
+    ymax = jnp.reshape(ymax, (1,))
+
+    curve_xs = jnp.linspace(xmin, xmax, num_segments + 1)
+    curve_ys = jnp.repeat((ymax - ymin) / 2, num_segments + 1)
+
+    if mono == Mono.UP:
+        curve_ys = jnp.linspace(ymin, ymax, num_segments + 1)
+    elif mono == Mono.DOWN:
+        curve_ys = jnp.linspace(ymax, ymin, num_segments + 1)
+
+    curve_xs = curve_xs.reshape((1, -1))
+    curve_ys = curve_ys.reshape((1, -1))
+    mono = jnp.reshape(mono, (1,))
+
+    return Pwlcurve(xs=curve_xs, ys=curve_ys,
+                    xmin=xmin, xmax=xmax,
+                    ymin=ymin, ymax=ymax,
+                    mono=mono)

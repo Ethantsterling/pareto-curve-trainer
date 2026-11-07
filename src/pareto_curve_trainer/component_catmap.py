@@ -51,7 +51,7 @@ class Catmap(NamedTuple):
         new_map = self._replace(map=InternalCatmap(ys=new_ys))
         return new_map
 
-    def merge(self, other) -> Self:
+    def merge(self, other: Self) -> Self:
         """We have to control for the weird dimensionality possibilities. """
         merged_map = self.map.merge(other.map)
         # For a clean merge, we need to broadcast the params to the correct dimensionality.
@@ -86,3 +86,24 @@ class Catmap(NamedTuple):
         """The number of categorical maps represented by this component."""
         ys = self.map.ys
         return len(ys) if (jnp.ndim(ys) == 2) else 1
+
+
+def catmap_from_data(xs, ymin: int=0, ymax: int=1, mono=cu.Mono.NON_MONO):
+    """Initialize a catmap that infers its number of categories from the data.
+    
+    Complication: the user is responsible for converting categories to the index format, where
+    the categories are numbered starting from 0 and incrementing up to (#categories - 1)."""
+    xs = jnp.array(xs)
+    num_uniques = len(jnp.unique(xs))
+    ys = jnp.repeat((ymax - ymin) / 2, num_uniques)
+
+    if mono == cu.Mono.UP:
+        ys = jnp.linspace(ymin, ymax, num_uniques)
+    elif mono == cu.Mono.DOWN:
+        ys = jnp.linspace(ymax, ymin, num_uniques)
+    ys = ys.reshape((1, -1))
+    ymin = jnp.reshape(ymin, shape=(1,))
+    ymax = jnp.reshape(ymax, shape=(1,))
+    mono = jnp.reshape(mono, shape=(1,))
+
+    return Catmap(InternalCatmap(ys), ymin=ymin, ymax=ymax, mono=mono)

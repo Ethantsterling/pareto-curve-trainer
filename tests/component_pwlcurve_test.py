@@ -1,3 +1,4 @@
+"""Tests for the Pwlcurve component."""
 # pylint: disable=missing-function-docstring
 # pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
@@ -8,7 +9,8 @@ import jax.numpy as jnp
 import pareto_curve_trainer.component_utils as cu
 from pareto_curve_trainer.component_utils import Mono
 from pareto_curve_trainer.component_pwlcurve import (
-    jax_curve_slopes, jax_curve_eval, jax_curves_slopes, jax_curves_eval, Pwlcurve)
+    jax_curve_slopes, jax_curve_eval, jax_curves_slopes, jax_curves_eval, Pwlcurve,
+    pwlcurve_from_data)
 
 # Ensure jittability in these tests.
 Pwlcurve = jax.jit(Pwlcurve)
@@ -106,3 +108,29 @@ def test_merge():
 
 def test_num_rows():
     assert test_pwlcurve.num_rows() == 2
+
+
+def test_pwlcurve_from_data():
+    x = jax.random.uniform(shape=100, key=jax.random.key(324))
+    ymin, ymax = -2, 4
+    for monotonicity in [Mono.NON_MONO, Mono.UP, Mono.DOWN]:
+        pwlcurve = pwlcurve_from_data(x, num_segments=5, ymin=ymin, ymax=ymax, mono=monotonicity)
+        assert pwlcurve.xs.shape[-1] == 6 == pwlcurve.ys.shape[-1]
+        assert pwlcurve.ymin == ymin
+        assert pwlcurve.ymax == ymax
+        assert pwlcurve.xmin == jnp.min(x)
+        assert pwlcurve.xmax == jnp.max(x)
+        assert jnp.all(pwlcurve.xmin <= pwlcurve.xs)
+        assert jnp.all(pwlcurve.xs <= pwlcurve.xmax)
+        assert jnp.all(pwlcurve.ymin <= pwlcurve.ys)
+        assert jnp.all(pwlcurve.ys <= pwlcurve.ymax)
+        # xs must be strictly monotonic.
+        assert jnp.all(pwlcurve.xs[:, :-1] < pwlcurve.xs[:, 1:])
+
+    # y's monotonicity needs to match `mono=`.
+    pwlcurve = pwlcurve_from_data(
+        x, num_segments=5, ymin=ymin, ymax=ymax, mono=Mono.UP, x_clip_frac=.2)
+    assert jnp.all(pwlcurve.ys[:, :-1] <= pwlcurve.ys[:, 1:])
+    pwlcurve = pwlcurve_from_data(
+        x, num_segments=5, ymin=ymin, ymax=ymax, mono=Mono.DOWN, x_clip_frac=.1)
+    assert jnp.all(pwlcurve.ys[:, :-1] >= pwlcurve.ys[:, 1:])

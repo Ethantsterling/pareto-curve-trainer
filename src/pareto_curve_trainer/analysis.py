@@ -1,4 +1,4 @@
-"""Tools for analyzing dataset before and after training."""
+"""Tools for analyzing a dataset before and after training."""
 from typing import List
 import altair as alt
 
@@ -28,7 +28,7 @@ def plot_2d(df,
       opacity_bool: Optional feature name to highlight True points and fade False points.
         Normally used to highlight the pareto frontier and de-emphasize dominated points.
     """
-    # Always put these as tooltip labels.
+    # Always include these as tooltip labels.
     for label in [x, y, category, opacity_bool]:
         if label is not None and label not in tooltip:
             tooltip.append(label)

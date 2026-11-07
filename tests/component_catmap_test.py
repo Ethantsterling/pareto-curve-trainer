@@ -6,7 +6,7 @@ os.environ["JAX_PLATFORMS"] = "cpu"
 import jax
 import jax.numpy as jnp
 from pareto_curve_trainer.component_utils import Mono
-from pareto_curve_trainer.component_catmap import Catmap, InternalCatmap
+from pareto_curve_trainer.component_catmap import Catmap, InternalCatmap, catmap_from_data
 
 # Ensure jittability in these tests.
 InternalCatmap = jax.jit(InternalCatmap)
@@ -151,3 +151,24 @@ def test_mixed_2d():
     assert ys[2][1] > ys[2][2]
     assert ys[2][0] > ys[2][2]
     assert ys[2][1] > ys[2][0] > ys[2][2]
+
+
+
+# def catmap_from_data(xs, ymin: int=0, ymax: int=1, mono=cu.Mono.NON_MONO):
+
+def test_catmap_from_data():
+    x = jax.random.randint(shape=100, minval=0, maxval=6, key=jax.random.key(324))
+    ymin, ymax = -2, 4
+    for monotonicity in [Mono.NON_MONO, Mono.UP, Mono.DOWN]:
+        catmap = catmap_from_data(x, ymin=ymin, ymax=ymax, mono=monotonicity)
+        assert catmap.map.ys.shape[-1] == 6  # 6 unique values for x.
+        assert catmap.ymin == ymin
+        assert catmap.ymax == ymax
+        assert jnp.all(catmap.ymin <= catmap.map.ys)
+        assert jnp.all(catmap.map.ys <= catmap.ymax)
+
+    # Monotonicity needs to match.
+    catmap = catmap_from_data(x, ymin=ymin, ymax=ymax, mono=Mono.UP)
+    assert jnp.all(catmap.map.ys[:, :-1] <= catmap.map.ys[:, 1:])
+    catmap = catmap_from_data(x, ymin=ymin, ymax=ymax, mono=Mono.DOWN)
+    assert jnp.all(catmap.map.ys[:, :-1] >= catmap.map.ys[:, 1:])
