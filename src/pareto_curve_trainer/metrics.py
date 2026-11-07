@@ -184,3 +184,14 @@ def anchored_ndcg_metric(
         labels,
         groups,
         normalize=metrics_util.Normalization.GROUP_MAX_ONE)
+
+
+def group_rank(predictions, groups):
+    """Rank primarily by groups (ascending) and secondary by predictions (descending).
+    
+    Alternative to jnp.lexsort that's ~3x faster on GPU for ~1M points.
+    Ranking metrics require this kind of sorting, which is a bottleneck for training.
+    """
+    pred_order = jnp.argsort(predictions, descending=True)
+    group_pred_order = jnp.argsort(groups[pred_order])
+    return pred_order[group_pred_order]

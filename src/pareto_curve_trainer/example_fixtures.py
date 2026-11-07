@@ -135,16 +135,6 @@ def example_metrics_fn(xs, predictions):
     return mse_1, mse_2
 
 
-def _fast_lexsort2(predictions, groups):
-    """Alternative to jnp.lexsort that's ~3x faster on GPU for ~1M points.
-    
-    Ranking metrics require this kind of sorting, which is a bottleneck for training.
-    """
-    pred_order = jnp.argsort(predictions)
-    group_pred_order = jnp.argsort(groups[pred_order])
-    return pred_order[group_pred_order]
-
-
 class ExampleRankedMetrics(NamedTuple):
     """A Pytree version of metrics_fn so that we can contain arrays."""
     ncdg_metric_1: metrics.AnchoredOrderMetric
@@ -153,7 +143,7 @@ class ExampleRankedMetrics(NamedTuple):
     def __call__(self, xs, predictions):
         groups = xs['groups']
         # This sort is the slowest part of training.
-        order = _fast_lexsort2(-predictions, groups)
+        order = metrics.group_rank(predictions, groups)
         ndcg_score_1 = self.ncdg_metric_1.eval(xs['label'][order])
         ndcg_score_2 = self.ncdg_metric_2.eval(xs['label_2'][order])
         return ndcg_score_1, ndcg_score_2

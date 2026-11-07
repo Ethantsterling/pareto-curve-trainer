@@ -138,7 +138,7 @@ def population_train(
     metrics_fn,
     model_fn,
     population_size: int = 50,
-    num_steps: int = 10_000,
+    num_steps: int = 100_000,
     max_scale: float = 0.1,
     min_scale: float = 0.01,
     random_key: jax.Array = jax.random.key(12345),
