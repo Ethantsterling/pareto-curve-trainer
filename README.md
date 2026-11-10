@@ -8,4 +8,4 @@ Inspired by:
 
 Example Notebooks:
 - [UCI Energy Efficiency](https://colab.research.google.com/drive/1Jr-UI1Y-brFHz-_Q_p85TTeMeUZGxGk7?usp=sharing): trading off two objectives on a tiny dataset. Useful introduction.
-- [UCI Forest Cover Type](https://colab.research.google.com/drive/1BdRbL82jCShIt85OYby0swspVSbNZDk7?usp=sharing): Multiclass classification of one objective on a larger (~500K) dataset. This is more involved since it's multiclass.
+- [UCI Forest Cover Type](https://colab.research.google.com/drive/1w7NT2Q5_6N4DDJlJnokJkVVBhEej-iFv?usp=sharing): Multiclass classification of one objective on a larger (~500K) dataset. This is more involved since it's multiclass.
