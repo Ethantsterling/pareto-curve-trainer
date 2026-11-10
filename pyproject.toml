@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pareto_curve_trainer"
-version = "0.0.1"
+version = "0.1.0"
 description = "A JAX library for training tiny interpretable models on multiple objectives."
 license = "MIT"
 license-files = ["LICEN[CS]E"]
