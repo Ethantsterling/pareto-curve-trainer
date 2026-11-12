@@ -2,8 +2,10 @@
 from enum import IntEnum
 import os
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".20"
+import typing
 import jax
 import jax.numpy as jnp
+from pareto_curve_trainer.transforms import Transform
 
 
 class Mono(IntEnum):
@@ -35,7 +37,7 @@ def _2D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):  # pylint: di
 
 # TODO: Consolidate maybe_sorted and conditional_mono_sort. They serve the same purpose.
 # One's used for Catmap and the other for Pwlcurve, but the same operation should work for both.
-def _maybe_sorted_1d(a: jnp.array, mono: Mono) -> jnp.ndarray:
+def _maybe_sorted_1d(a: jnp.ndarray, mono: Mono) -> jnp.ndarray:
     """Sort `a` to match mono's direction."""
     print('mono is', mono)
     if mono == Mono.UP:
@@ -123,19 +125,48 @@ def constrain_by_bouncing(
     return jnp.where(x < xmin, xmin - x, jnp.where(x > xmax, 2 * xmax - x, x))
 
 
-def perturb_array(
+def _perturb_array(
     a: jax.typing.ArrayLike,
     min_val: jax.typing.ArrayLike,
     max_val: jax.typing.ArrayLike,
     scale: float,
-    key: jax.Array,
-):
+    key: jax.Array):
+    """Underlying perturb array with no special handling of dimensions or transforms."""
+    dtype = jax.dtypes.result_type(a)
+    max_shift = scale * (max_val - min_val)
+    shifts = jax.random.uniform(
+        key, shape=jnp.shape(a), dtype=dtype, minval=-max_shift, maxval=max_shift
+    )
+    new_a = constrain_by_bouncing(a + shifts, min_val, max_val)
+    return new_a
+
+
+def _perturb_array_under_transform(a: jax.typing.ArrayLike,
+                                   min_val: jax.typing.ArrayLike,
+                                   max_val: jax.typing.ArrayLike,
+                                   scale: float,
+                                   key: jax.Array,
+                                   fx: Transform) -> jnp.ndarray:
+    """Underlying perturb array with no special handling of dimensions."""
+    new_trans_a = _perturb_array(fx(a), fx(min_val), fx(max_val), scale, key)
+    new_a = fx.inverse(new_trans_a)
+    # Float approximation might slightly invalidate the bounds, so reinforce them.
+    return jnp.clip(new_a, min=min_val, max=max_val)
+
+
+def perturb_array(a: jax.typing.ArrayLike,
+                  min_val: jax.typing.ArrayLike,
+                  max_val: jax.typing.ArrayLike,
+                  scale: float,
+                  key: jax.Array,
+                  fx: None | Transform = None) -> jnp.ndarray:
     """Returns `a` randomly shifted by up to scale frac of max-min.
 
     `a` should be 0, 1, or 2D, and min&max should be 0 or 1D. If min&max are 1D,
     then `a` must be an array whose first dimension is the same size as min&max.
+
+    If an fx transform is provided, then perform the shift in the transformed space.
     """
-    dtype = jax.dtypes.result_type(a)
     # If a is (N, M) and min&max are (N), then default broadcasting will match
     # the wrong axis unless we expand min and max to (N, 1).
     # In all other cases, the default broadcasting is as intended.
@@ -143,21 +174,15 @@ def perturb_array(
         min_val = jnp.expand_dims(min_val, -1)
         max_val = jnp.expand_dims(max_val, -1)
 
-    max_shift = scale * (max_val - min_val)
-    shifts = jax.random.uniform(
-        key, shape=jnp.shape(a), dtype=dtype, minval=-max_shift, maxval=max_shift
-    )
-
-    new_a = constrain_by_bouncing(a + shifts, min_val, max_val)
-    return new_a
+    if fx is None:
+        return _perturb_array(a, min_val, max_val, scale, key)
+    return _perturb_array_under_transform(a, min_val, max_val, scale, key, fx)
 
 
-def randomize_array(
-    a: jax.typing.ArrayLike,    # Array of Floats
-    min_val: jax.typing.ArrayLike,
-    max_val: jax.typing.ArrayLike,
-    key: jax.Array,
-):
+def randomize_array(a: jax.typing.ArrayLike,    # Array of Floats
+                    min_val: jax.typing.ArrayLike,
+                    max_val: jax.typing.ArrayLike,
+                    key: jax.Array) -> jnp.ndarray:
     """Returns `a` randomized between max and min.
 
     `a` should be 0, 1, or 2D, and min&max should be 0 or 1D. If min&max are 1D,

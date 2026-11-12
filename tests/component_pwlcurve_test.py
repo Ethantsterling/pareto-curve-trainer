@@ -8,6 +8,8 @@ import jax
 import jax.numpy as jnp
 import pareto_curve_trainer.component_utils as cu
 from pareto_curve_trainer.component_utils import Mono
+from pareto_curve_trainer import transforms
+from pareto_curve_trainer.transforms import Identity, Log, Symlog1p
 from pareto_curve_trainer.component_pwlcurve import (
     jax_curve_slopes, jax_curve_eval, jax_curves_slopes, jax_curves_eval, Pwlcurve,
     pwlcurve_from_data)
@@ -134,3 +136,40 @@ def test_pwlcurve_from_data():
     pwlcurve = pwlcurve_from_data(
         x, num_segments=5, ymin=ymin, ymax=ymax, mono=Mono.DOWN, x_clip_frac=.1)
     assert jnp.all(pwlcurve.ys[:, :-1] >= pwlcurve.ys[:, 1:])
+
+
+def test_pwlcurve_from_data_transforms():
+    uniform_array = jnp.linspace(1.0, 12, num=1000)
+    exp_uniform_array = jnp.exp(uniform_array)
+
+    # pwlcurve_from_data should respect an explicitly-chosen transform.
+    for chosen_transform in [None, Identity, Log, Symlog1p]:
+        pwlcurve = pwlcurve_from_data(uniform_array, num_segments=4, fx=chosen_transform)
+        assert pwlcurve.fx is chosen_transform
+
+    # pwlcurve_from_data should infer the best transform from its options.
+    pwlcurve = pwlcurve_from_data(uniform_array, num_segments=4)
+    assert pwlcurve.fx is Identity
+    pwlcurve = pwlcurve_from_data(exp_uniform_array, num_segments=4)
+    assert pwlcurve.fx is Log
+    # If Log isn't an option, we'll prefer Symlog1p for the exponentation array.
+    pwlcurve = pwlcurve_from_data(exp_uniform_array, num_segments=4, fx=(Identity, Symlog1p))
+    assert pwlcurve.fx is Symlog1p
+    # If values are negative, Log won't be good, so we'll need Symlog1p.
+    pwlcurve = pwlcurve_from_data(-exp_uniform_array, num_segments=4)
+    assert pwlcurve.fx is Symlog1p
+    # If we exclude Symlog1p, Identity is better for negative values than Log.
+    pwlcurve = pwlcurve_from_data(-exp_uniform_array, num_segments=4, fx=(Identity, Log))
+    assert pwlcurve.fx is Identity
+
+
+def test_best_transform():
+    uniform_array = jnp.linspace(1.0, 12, num=1000)
+    log_uniform_array = jnp.log(uniform_array)
+    exp_uniform_array = jnp.exp(uniform_array)
+
+    assert transforms.best_transform(uniform_array) is Identity
+    # log array is compressed but applying a log-like transform again would just make it worse.
+    assert transforms.best_transform(log_uniform_array) is Identity
+    # An exp-distributed array clearly benefits from a log transform.
+    assert transforms.best_transform(exp_uniform_array) is Log

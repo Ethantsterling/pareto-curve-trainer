@@ -7,6 +7,7 @@ os.environ["JAX_PLATFORMS"] = "cpu"
 import jax  # pylint: disable=wrong-import-position
 import jax.numpy as jnp  # pylint: disable=wrong-import-position
 import pareto_curve_trainer.component_utils as cu
+from pareto_curve_trainer.transforms import Identity, Log, Symlog1p
 
 
 def test_constrain_by_wrapping():
@@ -37,6 +38,28 @@ def test_perturb_array():
         test_array, min_val=1.0, max_val=6.0, scale=0.1, key=test_key
     )
     assert (intended_array == perturbed_array).all()
+
+
+def test_perturb_array_fx():
+    """Verify that arrays are perturbed in the transformed space."""
+    test_key = jax.random.key(5)
+    min_val, max_val = jnp.exp(0), jnp.exp(10)
+    test_array = jnp.exp(jnp.arange(1, 10))  # e^1, e^2, ..., e^9.
+    scale = 0.1  # Our range is 0-10 in log space, so our shifts should be [-1, 1] in log space.
+    expected_min = jnp.exp(jnp.arange(0, 9))
+    expected_max = jnp.exp(jnp.arange(2, 11))
+    log_perturbed_array = cu.perturb_array(
+        test_array, min_val=min_val, max_val=max_val, scale=scale, key=test_key, fx=Log)
+    assert jnp.all(expected_min <= log_perturbed_array)
+    assert jnp.all(expected_max >= log_perturbed_array)
+
+    # Verify that these guarantees do not hold if we perturb in the non-fx space.
+    # There's a small chance they'd hold by accident, but realistically the 0.1 scale shift on an
+    # e^10 range will almost assuredly exceed one of the lower restrictions.
+    perturbed_array = cu.perturb_array(
+        test_array, min_val=min_val, max_val=max_val, scale=scale, key=test_key)
+    assert not jnp.all(expected_min <= perturbed_array)
+    assert not jnp.all(expected_max >= perturbed_array)
 
 
 def test_output_shape_matches():
@@ -71,11 +94,12 @@ def test_perturbed_obeys_min_and_max():
     array_key, perturb_key = jax.random.split(jax.random.key(5))
     MIN, MAX = 1.0, 4.0
     test_array = jax.random.uniform(minval=MIN, maxval=MAX, shape=500, key=array_key)
-    perturbed_array = cu.perturb_array(
-        test_array, scale=0.5, min_val=MIN, max_val=MAX, key=perturb_key)
-    assert (perturbed_array != test_array).all()  # Technically it could, but the chance is minute.  
-    assert (perturbed_array <= 4.0).all()
-    assert (perturbed_array >= 1.0).all()
+    for fx in [None, Identity, Log, Symlog1p]:
+        perturbed_array = cu.perturb_array(
+            test_array, scale=0.5, min_val=MIN, max_val=MAX, key=perturb_key, fx=fx)
+        assert (perturbed_array != test_array).all()  # Technically it could, but it won't.
+        assert (perturbed_array <= 4.0).all()
+        assert (perturbed_array >= 1.0).all()
 
 
 def test_randomize_obeys_min_and_max():
@@ -84,6 +108,6 @@ def test_randomize_obeys_min_and_max():
     test_array = jax.random.uniform(minval=MIN, maxval=MAX, shape=500, key=array_key)
     randomized_array = cu.randomize_array(
         test_array, min_val=MIN, max_val=MAX, key=randomize_key)
-    assert (randomized_array != test_array).all()  # Technically it could, but the chance is minute.
+    assert (randomized_array != test_array).all()  # Technically it could, but it won't.
     assert (randomized_array <= MAX).all()
     assert (randomized_array >= MIN).all()

@@ -1,12 +1,12 @@
 """A trainable vectorized piecewise-linear-curve component and supporting functions."""
+from dataclasses import dataclass
+from functools import partial
+from typing import Callable, List, NamedTuple, Self, Tuple
 import jax
 import jax.numpy as jnp
-
-from functools import partial
-from typing import Callable, List, NamedTuple, Self
-
 import pareto_curve_trainer.component_utils as cu
 from pareto_curve_trainer.component_utils import Mono
+from pareto_curve_trainer import transforms
 
 
 def jax_curve_slopes(
@@ -156,7 +156,9 @@ class StructPwlcurve(NamedTuple):
         return f"PWLCurve({points}, fx={self.fx.__name__})"
 
 
-class Pwlcurve(NamedTuple):
+@jax.tree_util.register_dataclass
+@dataclass
+class Pwlcurve:
     """A vectorized, trainable component representing variants of a pwlcurve."""
     xs: jnp.ndarray    # 2D num_curves x curve_size floats
     ys: jnp.ndarray    # 2D num_curves x curve_size floats
@@ -165,28 +167,26 @@ class Pwlcurve(NamedTuple):
     ymin: float  # jnp.ndarray  # 1D floats
     ymax: float  # jnp.ndarray  # 1D floats
     mono: Mono   # jnp.ndarray  # 1D array of ints representing the Mono enum values.
-    # For now, let's omit fx.
+    fx: Callable[[jnp.ndarray], jnp.ndarray] | None = jax.tree.static(default=None)
 
     def eval(self, data: jnp.ndarray) -> jnp.ndarray:
         """Calculates each pwlcurve on each data point."""
         if jnp.ndim(self.xs) == 1:
             # This allows us to do eval in a jax map/vmap if we want.
-            return jax_curve_eval(self.xs, self.ys, data, fx=None)
-        return jax_curves_eval(self.xs, self.ys, data, fx=None)
+            return jax_curve_eval(self.xs, self.ys, data, fx=self.fx)
+        return jax_curves_eval(self.xs, self.ys, data, fx=self.fx)
 
     def perturbed(self, scale: float, key: jax.Array) -> Self:
         """Randomly shifts each curve coordinate by up to a scaled fraction of its range."""
         key_x, key_y = jax.random.split(key)
-        xs = cu.perturb_array(self.xs, self.xmin, self.xmax, scale, key_x)
+        # Note that perturbing xs is done in the transformed space.
+        xs = cu.perturb_array(self.xs, self.xmin, self.xmax, scale, key_x, fx=self.fx)
         ys = cu.perturb_array(self.ys, self.ymin, self.ymax, scale, key_y)
-        # TODO: when we add fx transforms, do the perturbing in the transformed space.
-        # This likely requires transforming xs & constraints, perturbing, and transforming
-        # back, which also requires transforms be reversible.
 
         # Always sort xs. Follow the mono constraints for ys.
         xs = jnp.sort(xs)  # Sorts on rightmost axis by default, which is what we want.
         ys = cu.vectorized_conditional_mono_sort(ys, self.mono)
-        new_trainable_curve = self._replace(xs=xs, ys=ys)
+        new_trainable_curve = self.__replace__(xs=xs, ys=ys)
         return new_trainable_curve
 
     def randomized(self, key: jax.Array) -> Self:
@@ -195,7 +195,7 @@ class Pwlcurve(NamedTuple):
 
     def merge(self, other: Self) -> Self:
         """Concatenate this vector of curves with another."""
-        return self._replace(
+        return self.__replace__(
             xs=jnp.concatenate([self.xs, other.xs]),
             ys=jnp.concatenate([self.ys, other.ys]),
             xmin=jnp.concatenate([self.xmin, other.xmin]),
@@ -234,16 +234,26 @@ def pwlcurve_from_data(xs: jnp.ndarray,
                        ymin: int=0,
                        ymax: int=1,
                        mono=Mono.NON_MONO,
-                       x_clip_frac: float|None=None):
-    """Initialize a pwlcurve that infers xmin and xmax from the data.
+                       x_clip_frac: float|None=None,
+                       fx: None | transforms.Transform | Tuple[transforms.Transform] =
+                        (transforms.Identity, transforms.Log, transforms.Symlog1p),
+                       ) -> Pwlcurve:
+    """Initialize a pwlcurve that infers xmin, xmax, and fx from data.
+        
+    Args:
+        xs: The intended input for the pwlcurve.
+        num_segments: The number of distinct linear sections 
+        ymin: The minimum output constraint for the pwlcurve, which will be maintained in training.
+        ymax: The maximum output constraint for the pwlcurve, which will be maintained in training.
+        mono: The monotonicity constraint for the pwlcurve, which will be maintained in training.
+        x_clip_frac: An optional fraction of the extremes to clip before inferring the constraints
+            and the transform. Potentially useful if there are severe outliers.
+        fx: A specified Transform, or a tuple of Transform for this function to choose between
+            based on how well they even out the distribution of xs.
     
-    TODO: if/when input transforms are incorporated, infer a good transform from
-    the xs. Use some kind of uniformity/distribution.
-    
-    Complication: x-outliers are a problem for our algorithms, both because linear
-    segments don't do well with outliers and because 
-    
-    x_clip_frac optionally trims the extremes to avoid skewing by outliers."""
+    Results:
+        A trainable Pwlcurve with reasonable constraints and initial configuration for the data.
+    """
     xs = jnp.array(xs)
     if x_clip_frac:
         assert 0 <= x_clip_frac < 0.5
@@ -258,10 +268,9 @@ def pwlcurve_from_data(xs: jnp.ndarray,
         xmax = jnp.max(xs)
 
     # For proper stacking, these need to be 1D arrays even if there's just one element.
-    # In the future these constraint fields should probably be nonstacking singletons, perhaps
-    # by using equinox.Module? In theory it's interesting to allow the components to start with
-    # multiple variations of the constraint fields, but I struggle to think of a situation where
-    # we would actually want that.
+    # In the future these constraint fields should probably be nonstacking singletons.
+    # In theory it's interesting to allow the components to start with multiple variations of the
+    # constraint fields, but I struggle to think of a situation where we would actually want that.
     xmin = jnp.reshape(xmin, (1,))
     xmax = jnp.reshape(xmax, (1,))
     ymin = jnp.reshape(ymin, (1,))
@@ -279,7 +288,10 @@ def pwlcurve_from_data(xs: jnp.ndarray,
     curve_ys = curve_ys.reshape((1, -1))
     mono = jnp.reshape(mono, (1,))
 
+    if fx is not None and not isinstance(fx, transforms.Transform):
+        fx = transforms.best_transform(xs, xmin=xmin, xmax=xmax, transforms=fx)
+
     return Pwlcurve(xs=curve_xs, ys=curve_ys,
                     xmin=xmin, xmax=xmax,
                     ymin=ymin, ymax=ymax,
-                    mono=mono)
+                    mono=mono, fx=fx)
