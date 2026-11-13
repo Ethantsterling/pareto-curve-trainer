@@ -1,11 +1,14 @@
 """Tests for component_utils.py."""
+
 # pylint: disable=missing-function-docstring
 # pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
+
 os.environ["JAX_PLATFORMS"] = "cpu"
 import jax  # pylint: disable=wrong-import-position
 import jax.numpy as jnp  # pylint: disable=wrong-import-position
+
 import pareto_curve_trainer.component_utils as cu
 from pareto_curve_trainer.transforms import Identity, Log, Symlog1p
 
@@ -49,7 +52,8 @@ def test_perturb_array_fx():
     expected_min = jnp.exp(jnp.arange(0, 9))
     expected_max = jnp.exp(jnp.arange(2, 11))
     log_perturbed_array = cu.perturb_array(
-        test_array, min_val=min_val, max_val=max_val, scale=scale, key=test_key, fx=Log)
+        test_array, min_val=min_val, max_val=max_val, scale=scale, key=test_key, fx=Log
+    )
     assert jnp.all(expected_min <= log_perturbed_array)
     assert jnp.all(expected_max >= log_perturbed_array)
 
@@ -57,18 +61,21 @@ def test_perturb_array_fx():
     # There's a small chance they'd hold by accident, but realistically the 0.1 scale shift on an
     # e^10 range will almost assuredly exceed one of the lower restrictions.
     perturbed_array = cu.perturb_array(
-        test_array, min_val=min_val, max_val=max_val, scale=scale, key=test_key)
+        test_array, min_val=min_val, max_val=max_val, scale=scale, key=test_key
+    )
     assert not jnp.all(expected_min <= perturbed_array)
     assert not jnp.all(expected_max >= perturbed_array)
 
 
 def test_output_shape_matches():
-# Verify that output shape depends only on the input array's shape.
+    # Verify that output shape depends only on the input array's shape.
     test_key = jax.random.key(5)
     for a_shape in [(), (3,), (3, 5)]:
         _array = jax.random.uniform(key=test_key, shape=a_shape)
         # If min&max are 0D:
-        _array_perturbed = cu.perturb_array(_array, min_val=0.0, max_val=1.0, scale=0.2, key=test_key)
+        _array_perturbed = cu.perturb_array(
+            _array, min_val=0.0, max_val=1.0, scale=0.2, key=test_key
+        )
         assert jnp.shape(_array) == jnp.shape(_array_perturbed)
 
         if len(a_shape) != 0:
@@ -96,7 +103,8 @@ def test_perturbed_obeys_min_and_max():
     test_array = jax.random.uniform(minval=MIN, maxval=MAX, shape=500, key=array_key)
     for fx in [None, Identity, Log, Symlog1p]:
         perturbed_array = cu.perturb_array(
-            test_array, scale=0.5, min_val=MIN, max_val=MAX, key=perturb_key, fx=fx)
+            test_array, scale=0.5, min_val=MIN, max_val=MAX, key=perturb_key, fx=fx
+        )
         assert (perturbed_array != test_array).all()  # Technically it could, but it won't.
         assert (perturbed_array <= 4.0).all()
         assert (perturbed_array >= 1.0).all()
@@ -106,8 +114,7 @@ def test_randomize_obeys_min_and_max():
     array_key, randomize_key = jax.random.split(jax.random.key(5))
     MIN, MAX = 1.0, 4.0
     test_array = jax.random.uniform(minval=MIN, maxval=MAX, shape=500, key=array_key)
-    randomized_array = cu.randomize_array(
-        test_array, min_val=MIN, max_val=MAX, key=randomize_key)
+    randomized_array = cu.randomize_array(test_array, min_val=MIN, max_val=MAX, key=randomize_key)
     assert (randomized_array != test_array).all()  # Technically it could, but it won't.
     assert (randomized_array <= MAX).all()
     assert (randomized_array >= MIN).all()

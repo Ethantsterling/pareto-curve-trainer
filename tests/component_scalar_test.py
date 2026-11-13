@@ -1,19 +1,24 @@
 """Tests for component_scalar.py."""
+
 # pylint: disable=missing-function-docstring
 # pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
+
 os.environ["JAX_PLATFORMS"] = "cpu"
 import jax  # pylint: disable=wrong-import-position
 import jax.numpy as jnp  # pylint: disable=wrong-import-position
+
 from pareto_curve_trainer.component_scalar import Scalar
 
 # Ensure jittability in these tests.
 Scalar = jax.jit(Scalar)
 
-test_scalar = Scalar(s=3., smin=-1., smax=4.)
-test_scalar_2 = Scalar(s=2., smin=-2., smax=5.)
-test_scalar_3 = Scalar(s=jnp.array([2, 5.]), smin=jnp.array([-2., -3.]), smax=jnp.array([5., 6]))
+test_scalar = Scalar(s=3.0, smin=-1.0, smax=4.0)
+test_scalar_2 = Scalar(s=2.0, smin=-2.0, smax=5.0)
+test_scalar_3 = Scalar(
+    s=jnp.array([2, 5.0]), smin=jnp.array([-2.0, -3.0]), smax=jnp.array([5.0, 6])
+)
 
 
 def test_num_rows():
@@ -23,19 +28,33 @@ def test_num_rows():
 
 
 def test_value_times_array():
-    assert (test_scalar.value() * jnp.array([1., 2, 3]) == jnp.array([3., 6, 9])).all()
-    assert (test_scalar_3.value() * jnp.array([1., 2, 3]) == jnp.array([[2., 4, 6], [5., 10, 15]])).all()
+    assert (test_scalar.value() * jnp.array([1.0, 2, 3]) == jnp.array([3.0, 6, 9])).all()
+    assert (
+        test_scalar_3.value() * jnp.array([1.0, 2, 3]) == jnp.array([[2.0, 4, 6], [5.0, 10, 15]])
+    ).all()
 
 
 def test_merge():
-    assert (test_scalar.merge(test_scalar) ==
-            Scalar(s=jnp.array([3., 3.]), smin=jnp.array([-1., -1.]), smax=jnp.array([4., 4.])))
-    assert (test_scalar.merge(test_scalar_2) ==
-            Scalar(s=jnp.array([3., 2.]), smin=jnp.array([-1., -2.]), smax=jnp.array([4., 5.])))
-    assert (test_scalar.merge(test_scalar_3) ==
-            Scalar(s=jnp.array([3., 2., 5.]), smin=jnp.array([-1., -2., -3.]), smax=jnp.array([4., 5., 6.])))
-    assert (test_scalar_2.merge(test_scalar_3) ==
-            Scalar(s=jnp.array([2., 2., 5.]), smin=jnp.array([-2., -2., -3.]), smax=jnp.array([5., 5., 6.])))
+    assert test_scalar.merge(test_scalar) == Scalar(
+        s=jnp.array([3.0, 3.0]),
+        smin=jnp.array([-1.0, -1.0]),
+        smax=jnp.array([4.0, 4.0]),
+    )
+    assert test_scalar.merge(test_scalar_2) == Scalar(
+        s=jnp.array([3.0, 2.0]),
+        smin=jnp.array([-1.0, -2.0]),
+        smax=jnp.array([4.0, 5.0]),
+    )
+    assert test_scalar.merge(test_scalar_3) == Scalar(
+        s=jnp.array([3.0, 2.0, 5.0]),
+        smin=jnp.array([-1.0, -2.0, -3.0]),
+        smax=jnp.array([4.0, 5.0, 6.0]),
+    )
+    assert test_scalar_2.merge(test_scalar_3) == Scalar(
+        s=jnp.array([2.0, 2.0, 5.0]),
+        smin=jnp.array([-2.0, -2.0, -3.0]),
+        smax=jnp.array([5.0, 5.0, 6.0]),
+    )
 
 
 def test_perturbation():

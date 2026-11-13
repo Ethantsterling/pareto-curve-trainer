@@ -2,13 +2,19 @@
 
 GPU should train much faster than CPU.
 Benchmarks will (of course) depend on the speed of the system on which they're run."""
-import time
-import jax
-from pareto_curve_trainer.train import population_train
-from pareto_curve_trainer.example_fixtures import (
-    test_target_components, test_target_components_2, test_population,
-    example_metrics_fn, example_model_fn, generate_xs, make_example_ranked_metrics_fn)
 
+import time
+
+import jax
+
+from pareto_curve_trainer.example_fixtures import (
+    example_metrics_fn,
+    example_model_fn,
+    generate_xs,
+    make_example_ranked_metrics_fn,
+    test_population,
+)
+from pareto_curve_trainer.train import population_train
 
 test_xs_10k = generate_xs(10_000)
 test_xs_100k = generate_xs(100_000)
@@ -17,21 +23,19 @@ test_xs_1m = generate_xs(1_000_000)
 
 def is_device_available(device_type):
     """Check if CPU/GPU/TPU is available"""
-    if device_type.upper() == 'CPU':
+    if device_type.upper() == "CPU":
         # In JAX, a detected GPU may mask the CPU, so we have to check this way.
         try:
-            jax.devices('cpu')
+            jax.devices("cpu")
             return True
         except RuntimeError:
             return False
     return any(device.platform == device_type.lower() for device in jax.devices())
 
 
-def benchmark_training(xs,
-                       num_steps,
-                       population_size=50,
-                       device_type='CPU',
-                       metrics_fn=example_metrics_fn):
+def benchmark_training(
+    xs, num_steps, population_size=50, device_type="CPU", metrics_fn=example_metrics_fn
+):
     """Measure training time."""
     num_xs = len(next(iter(xs.values())))  # xs is a dictionary of 1D arrays.
     size = f"{num_xs:_} points for {num_steps:_} steps"
@@ -52,7 +56,8 @@ def benchmark_training(xs,
             model_fn=example_model_fn,
             population_size=population_size,
             num_steps=num_steps,
-            random_key=jax.random.key(5))
+            random_key=jax.random.key(5),
+        )
         learned_scores.block_until_ready()
         end_time = time.perf_counter()
 
@@ -74,28 +79,28 @@ ranking_metrics_fn_1m = make_example_ranked_metrics_fn(test_xs_1m)
 benchmark_training(
     xs=test_xs_10k,
     num_steps=10_000,
-    device_type='CPU',
+    device_type="CPU",
     metrics_fn=ranking_metrics_fn_10k,
 )
 
 benchmark_training(
     xs=test_xs_100k,
     num_steps=10_000,
-    device_type='GPU',
+    device_type="GPU",
     metrics_fn=ranking_metrics_fn_100k,
 )
 
 benchmark_training(
     xs=test_xs_100k,
     num_steps=100_000,
-    device_type='GPU',
+    device_type="GPU",
     metrics_fn=ranking_metrics_fn_100k,
 )
 
 benchmark_training(
     xs=test_xs_1m,
     num_steps=100_000,
-    device_type='GPU',
+    device_type="GPU",
     metrics_fn=ranking_metrics_fn_1m,
 )
 
@@ -108,32 +113,32 @@ print("""\nBenchmarking with two MSE objectives and four components:
 benchmark_training(
     xs=test_xs_100k,
     num_steps=10_000,
-    device_type='CPU',
+    device_type="CPU",
 )
 
 benchmark_training(
     xs=test_xs_100k,
     num_steps=10_000,
-    device_type='GPU',
+    device_type="GPU",
 )
 
 benchmark_training(
     xs=test_xs_100k,
     num_steps=100_000,
-    device_type='CPU',
+    device_type="CPU",
 )
 
 benchmark_training(
     xs=test_xs_100k,
     num_steps=100_000,
-    device_type='GPU',
+    device_type="GPU",
 )
 
 print("Not training on CPU with 1M points; it would be slow.\n")
 benchmark_training(
     xs=test_xs_1m,
     num_steps=100_000,
-    device_type='GPU',
+    device_type="GPU",
 )
 
 print("\nPopulation size 10_000 to make sure we can do that without exceeding memory:")
@@ -141,5 +146,5 @@ benchmark_training(
     xs=test_xs_1m,
     num_steps=100_000,
     population_size=10_000,
-    device_type='GPU',
+    device_type="GPU",
 )

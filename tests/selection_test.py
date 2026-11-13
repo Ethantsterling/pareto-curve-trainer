@@ -1,23 +1,32 @@
 """Tests for selection.py."""
+
 # pylint: disable=missing-function-docstring
 # pylint: disable=protected-access
 # pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
+
 os.environ["JAX_PLATFORMS"] = "cpu"
-import jax  
+import jax
 import jax.numpy as jnp
+
 from pareto_curve_trainer import selection
 from pareto_curve_trainer.selection import (
-    pareto_rank, pareto_rank_with_exclusion, pareto_domination,
-    _min_masked, crowding_distance, select_by, select)
+    _min_masked,
+    crowding_distance,
+    pareto_domination,
+    pareto_rank,
+    pareto_rank_with_exclusion,
+    select,
+    select_by,
+)
 
 # Tests need to ensure that select is jittable.
-select = jax.jit(select, static_argnames='target_size')
+select = jax.jit(select, static_argnames="target_size")
 
 
 def test_simple_cull_indices():
-    culled = selection.simple_cull_indices(jnp.array([5,2,3,4,1.]), 3)
+    culled = selection.simple_cull_indices(jnp.array([5, 2, 3, 4, 1.0]), 3)
     assert jnp.array_equal(culled, jnp.array([0, 2, 3]))
 
 
@@ -32,8 +41,8 @@ def original_pareto_rank(ys: jnp.ndarray) -> jnp.ndarray:
 
 
 # Make sure the rewritten version produces the same output.
-small_pop = jax.random.uniform(key=jax.random.key(123), shape=(5,2))
-big_population = jax.random.uniform(key=jax.random.key(123), shape=(500,4))
+small_pop = jax.random.uniform(key=jax.random.key(123), shape=(5, 2))
+big_population = jax.random.uniform(key=jax.random.key(123), shape=(500, 4))
 
 
 def test_pareto_rank_matches():
@@ -70,24 +79,34 @@ def test_pareto_rank_duplicate_points_do_not_dominate_each_other():
 
 
 def mask_dominated(dominated, exclusion_mask):
-    return jnp.where(exclusion_mask.reshape((-1,1)), dominated, False)
+    return jnp.where(exclusion_mask.reshape((-1, 1)), dominated, False)
 
 
 def test_pareto_domination():
-    domination = pareto_domination(jnp.array([[1], [2], [3.]]))
+    domination = pareto_domination(jnp.array([[1], [2], [3.0]]))
     # [i][j] means [i] dominates [j]
-    assert jnp.array_equal(domination, jnp.array([
-       [False, False, False],
-       [True, False, False],
-       [True, True, False],
-    ]))
+    assert jnp.array_equal(
+        domination,
+        jnp.array(
+            [
+                [False, False, False],
+                [True, False, False],
+                [True, True, False],
+            ]
+        ),
+    )
     # Falsify all rows where the mask is False.
     masked = mask_dominated(domination, jnp.array([True, False, True]))
-    assert jnp.array_equal(masked, jnp.array([
-       [False, False, False],
-       [False, False, False],
-       [True, True, False],
-    ]))
+    assert jnp.array_equal(
+        masked,
+        jnp.array(
+            [
+                [False, False, False],
+                [False, False, False],
+                [True, True, False],
+            ]
+        ),
+    )
 
 
 def validate_pareto_rank_with_exclusion(ys, mask):
@@ -112,7 +131,9 @@ def test_pareto_rank_with_exclusion():
     for i in range(5):
         _test_key, _mask_key = jax.random.split(jax.random.key(i))
         for num_metrics in range(1, 4):
-            _test_ys = jax.random.randint(key=_test_key, shape=[_test_size, num_metrics], minval=-1, maxval=3).astype(float)
+            _test_ys = jax.random.randint(
+                key=_test_key, shape=[_test_size, num_metrics], minval=-1, maxval=3
+            ).astype(float)
             _test_mask = jax.random.randint(_mask_key, _test_size, minval=0, maxval=2).astype(bool)
             validate_pareto_rank_with_exclusion(_test_ys, _test_mask)
 
@@ -120,30 +141,40 @@ def test_pareto_rank_with_exclusion():
 def test_min_masked():
     _mask_test_array = jnp.array(
         [
-            [1, 5.],
-            [3, 4.],
-            [2, 1.],
-            [5., 2.],
-            [6., 3.],
-        ])
+            [1, 5.0],
+            [3, 4.0],
+            [2, 1.0],
+            [5.0, 2.0],
+            [6.0, 3.0],
+        ]
+    )
 
     # When the mask is all True, nothing should happen.
-    assert (_min_masked(_mask_test_array, jnp.ones(len(_mask_test_array), dtype=bool))
-            == _mask_test_array).all()
+    assert jnp.array_equal(
+        _min_masked(_mask_test_array, jnp.ones(len(_mask_test_array), dtype=bool)), _mask_test_array
+    )
     # When the mask is all false, we expect all nans.
-    assert jnp.isnan(_min_masked(_mask_test_array, jnp.zeros(len(_mask_test_array), dtype=bool))).all()
+    assert jnp.isnan(
+        _min_masked(_mask_test_array, jnp.zeros(len(_mask_test_array), dtype=bool))
+    ).all()
 
     # Subtlety: if we mask out the minimum value in a column, the masked row's value
     # will actual increase, because it'll be set to the non-masked min.
     # This is intentional with the way crowding_distance gets calculated.
-    assert (_min_masked(_mask_test_array, jnp.array([True, True, False, True, True])) ==
-            jnp.array([(1, 5.), (3, 4), (1, 2), (5, 2), (6, 3)])).all()
+    assert jnp.array_equal(
+        _min_masked(_mask_test_array, jnp.array([True, True, False, True, True])),
+        jnp.array([(1, 5.0), (3, 4), (1, 2), (5, 2), (6, 3)]),
+    )
 
-    assert (_min_masked(_mask_test_array, jnp.array([True, True, True, True, False])) ==
-            jnp.array([(1, 5.), (3, 4), (2, 1), (5, 2), (1, 1)])).all()
+    assert jnp.array_equal(
+        _min_masked(_mask_test_array, jnp.array([True, True, True, True, False])),
+        jnp.array([(1, 5.0), (3, 4), (2, 1), (5, 2), (1, 1)]),
+    )
 
-    assert (_min_masked(_mask_test_array, jnp.array([False, False, True, True, True])) ==
-            jnp.array([(2, 1), (2, 1), (2, 1), (5, 2), (6, 3)])).all()
+    assert jnp.array_equal(
+        _min_masked(_mask_test_array, jnp.array([False, False, True, True, True])),
+        jnp.array([(2, 1), (2, 1), (2, 1), (5, 2), (6, 3)]),
+    )
 
 
 def validate_crowding_distance_with_mask(ys, mask):
@@ -167,31 +198,38 @@ def test_crowding_distance_on_random_examples():
     for i in range(5):
         _test_key, _mask_key = jax.random.split(jax.random.key(i))
         for num_metrics in range(1, 4):
-            _test_ys = jax.random.randint(key=_test_key, shape=[_test_size, num_metrics], minval=-1, maxval=3).astype(float)
+            _test_ys = jax.random.randint(
+                key=_test_key, shape=[_test_size, num_metrics], minval=-1, maxval=3
+            ).astype(float)
             _test_mask = jax.random.randint(_mask_key, _test_size, minval=0, maxval=2).astype(bool)
             validate_crowding_distance_with_mask(_test_ys, _test_mask)
 
 
 def test_select_by():
-    assert (select_by(jnp.array([1,3,3,3,5]), target=3) == jnp.array([0, 1, 1, 1, 2])).all()
-    assert (select_by(jnp.array([5,1,3,3,3]), target=3) == jnp.array([2, 0, 1, 1, 1])).all()
+    assert (select_by(jnp.array([1, 3, 3, 3, 5]), target=3) == jnp.array([0, 1, 1, 1, 2])).all()
+    assert (select_by(jnp.array([5, 1, 3, 3, 3]), target=3) == jnp.array([2, 0, 1, 1, 1])).all()
     # If there's no border then we're all 0's and 2's.
-    print(select_by(jnp.array([5,1,2,4,3]), target=3))
-    assert (select_by(jnp.array([5,1,2,4,3]), target=3) == jnp.array([2, 0, 0, 2, 2])).all()
-    assert (select_by(jnp.array([1,3,3,3,5]), target=10) == jnp.array([2, 2, 2, 2, 2])).all()
-    select_by(jnp.array([3,3,3,3,1]), target=2)
+    print(select_by(jnp.array([5, 1, 2, 4, 3]), target=3))
+    assert (select_by(jnp.array([5, 1, 2, 4, 3]), target=3) == jnp.array([2, 0, 0, 2, 2])).all()
+    assert (select_by(jnp.array([1, 3, 3, 3, 5]), target=10) == jnp.array([2, 2, 2, 2, 2])).all()
 
-    assert (select_by(
-        jnp.array([1,3,3,3,5]),
-        target=3,
-        tiebreaker=jnp.array([50, 5, 4, 4, 0]),
-        ) == jnp.array([0, 2, 1, 1, 2])).all()
+    assert (
+        select_by(
+            jnp.array([1, 3, 3, 3, 5]),
+            target=3,
+            tiebreaker=jnp.array([50, 5, 4, 4, 0]),
+        )
+        == jnp.array([0, 2, 1, 1, 2])
+    ).all()
 
-    assert (select_by(
-        jnp.array([1,3,3,3,5]),
-        target=3,
-        tiebreaker=jnp.array([50, 5, 4, 3, 0]),
-        ) == jnp.array([0, 2, 2, 0, 2])).all()
+    assert (
+        select_by(
+            jnp.array([1, 3, 3, 3, 5]),
+            target=3,
+            tiebreaker=jnp.array([50, 5, 4, 3, 0]),
+        )
+        == jnp.array([0, 2, 2, 0, 2])
+    ).all()
 
 
 def arrays_same_sorted(xs, ys):
@@ -204,9 +242,11 @@ def test_select():
     # Selection by priority and pareto are predictable.
     # Crowding distance is harder to eyeball, especially when it breaks ties pseudorandomly.
     _test_priority_score = jnp.array([1, 2, 3, 4, 5], dtype=float)
-    _test_metric_scores = jnp.array([(2, 2), (3, 3), (4, 4), (5, 5), (1,1)], dtype=float)
+    _test_metric_scores = jnp.array([(2, 2), (3, 3), (4, 4), (5, 5), (1, 1)], dtype=float)
 
-    _selection = select(scores=_test_metric_scores, target_size=2, priority_score=_test_priority_score)
+    _selection = select(
+        scores=_test_metric_scores, target_size=2, priority_score=_test_priority_score
+    )
     assert arrays_same_sorted(jnp.array([3, 4]), _selection), _selection
     _selection = select(scores=_test_metric_scores, target_size=2)
     assert arrays_same_sorted(jnp.array([2, 3]), _selection), _selection
@@ -217,21 +257,23 @@ def test_select():
     # (in each metric), not only against its selected neighbors.
     # Consequently, selection by crowding distance is not guaranteed to select
     # the most spread frontier available from those points.
-    _test_metric_scores = jnp.array([(1, 5), (2, 4), (3, 3), (4, 2), (5,1)], dtype=float)
+    _test_metric_scores = jnp.array([(1, 5), (2, 4), (3, 3), (4, 2), (5, 1)], dtype=float)
     _selection = select(scores=_test_metric_scores, target_size=2)
     assert arrays_same_sorted(jnp.array([0, 4]), _selection), _selection
 
-    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5,1)], dtype=float)
+    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5, 1)], dtype=float)
     _selection = select(scores=_test_metric_scores, target_size=2)
     assert arrays_same_sorted(jnp.array([0, 3]), _selection), _selection
 
-    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5,1)], dtype=float)
+    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5, 1)], dtype=float)
     _selection = select(scores=_test_metric_scores, target_size=3)
     assert arrays_same_sorted(jnp.array([0, 1, 3]), _selection), _selection
 
-    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5,1)], dtype=float)
-    _test_priority_score = jnp.array([0, 0, 1, 0.])
-    _selection = select(scores=_test_metric_scores, priority_score=_test_priority_score, target_size=3)
+    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5, 1)], dtype=float)
+    _test_priority_score = jnp.array([0, 0, 1, 0.0])
+    _selection = select(
+        scores=_test_metric_scores, priority_score=_test_priority_score, target_size=3
+    )
     assert arrays_same_sorted(jnp.array([0, 2, 3]), _selection), _selection
 
 
@@ -242,7 +284,9 @@ def test_selection_when_priority_dominates():
             # The metric scores don't matter when the priority score overwhelms them.
             _test_metric_scores = jax.random.uniform(shape=(10, num_metrics), key=jax.random.key(i))
             _test_priority_score = jnp.array([-1, 1, -2, 2, -3, 3, -4, 4, -5, 5], dtype=float)
-            _selection = select(scores=_test_metric_scores, priority_score=_test_priority_score, target_size=4)
+            _selection = select(
+                scores=_test_metric_scores, priority_score=_test_priority_score, target_size=4
+            )
             assert arrays_same_sorted([3, 5, 7, 9], _selection)
 
 
@@ -253,12 +297,15 @@ def test_pareto_without_priority():
         _test_metric_scores = jax.random.uniform(shape=(10, 1), key=jax.random.key(i))
         _expected_indices = jnp.argsort(_test_metric_scores.flatten())[-_target_size:]
         _selection = select(scores=_test_metric_scores, target_size=_target_size)
-        assert arrays_same_sorted(_expected_indices, _selection), (_expected_indices, _selection)
+        assert arrays_same_sorted(_expected_indices, _selection), (
+            _expected_indices,
+            _selection,
+        )
 
-    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5,1)], dtype=float)
+    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5, 1)], dtype=float)
     _selection = select(scores=_test_metric_scores, target_size=2)
     assert arrays_same_sorted(jnp.array([0, 3]), _selection), _selection
 
-    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5,1)], dtype=float)
+    _test_metric_scores = jnp.array([(1, 5), (3, 3), (4, 2), (5, 1)], dtype=float)
     _selection = select(scores=_test_metric_scores, target_size=3)
     assert arrays_same_sorted(jnp.array([0, 1, 3]), _selection), _selection

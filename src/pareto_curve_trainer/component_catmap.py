@@ -1,12 +1,16 @@
 """A trainable component mapping a categorical input to floating point output."""
+
+from typing import NamedTuple, Self
+
 import jax
 import jax.numpy as jnp
-from typing import NamedTuple, Self
+
 import pareto_curve_trainer.component_utils as cu
 
 
 class InternalCatmap(NamedTuple):
     """A categorical map without the necessary parameters for training."""
+
     ys: jnp.ndarray
 
     def eval(self, data: jnp.ndarray):
@@ -25,12 +29,13 @@ class InternalCatmap(NamedTuple):
 
 class Catmap(NamedTuple):
     """A vectorized, trainable component representing category-to-float maps."""
+
     # Categories must be indices into y.
     # That requires preconverting string categories into ints, which we'll need
     # to do somewhere.
-    map: InternalCatmap                           # 1D or 2D of floats
-    ymin: jax.typing.ArrayLike                     # 0D or 1D of floats
-    ymax: jax.typing.ArrayLike                     # 0D or 1D of floats
+    map: InternalCatmap  # 1D or 2D of floats
+    ymin: jax.typing.ArrayLike  # 0D or 1D of floats
+    ymax: jax.typing.ArrayLike  # 0D or 1D of floats
     mono: jax.typing.ArrayLike = cu.Mono.NON_MONO  # Of Mono int enums
 
     def eval(self, data: jnp.ndarray):
@@ -52,7 +57,7 @@ class Catmap(NamedTuple):
         return new_map
 
     def merge(self, other: Self) -> Self:
-        """We have to control for the weird dimensionality possibilities. """
+        """We have to control for the weird dimensionality possibilities."""
         merged_map = self.map.merge(other.map)
         # For a clean merge, we need to broadcast the params to the correct dimensionality.
         sdim = (cu._2D(self.map.ys).shape[0],)
@@ -74,9 +79,11 @@ class Catmap(NamedTuple):
 
     def constraints_equal(self, other: Self):
         """Check if this Catmap has the same constraint parameters as another."""
-        return (jnp.all(self.ymin == other.ymin) and
-                jnp.all(self.ymax == other.ymax) and
-                jnp.all(self.mono == other.mono))
+        return (
+            jnp.all(self.ymin == other.ymin)
+            and jnp.all(self.ymax == other.ymax)
+            and jnp.all(self.mono == other.mono)
+        )
 
     def __eq__(self, other: Self) -> bool:
         return (self.map == other.map) and self.constraints_equal(other)
@@ -88,9 +95,9 @@ class Catmap(NamedTuple):
         return len(ys) if (jnp.ndim(ys) == 2) else 1
 
 
-def catmap_from_data(xs, ymin: int=0, ymax: int=1, mono=cu.Mono.NON_MONO):
+def catmap_from_data(xs, ymin: int = 0, ymax: int = 1, mono: cu.Mono = cu.Mono.NON_MONO):
     """Initialize a catmap that infers its number of categories from the data.
-    
+
     Complication: the user is responsible for converting categories to the index format, where
     the categories are numbered starting from 0 and incrementing up to (#categories - 1)."""
     xs = jnp.array(xs)

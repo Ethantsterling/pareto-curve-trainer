@@ -1,15 +1,15 @@
-"""Transforms """
-from abc import ABC, abstractmethod, ABCMeta
+"""Transforms"""
+
 import math
-from typing import Callable, Literal, Tuple
-import jax
+from abc import ABCMeta, abstractmethod
+
 import jax.numpy as jnp
 
 
 class Transform(ABCMeta):
     """Abstract class that couples a fn:R-->R with its inverse."""
 
-    # Overrides __init__ so we can use a Transform like a 
+    # Overrides __init__ so we can use a Transform subclass like a function.
     def __call__(cls, x: jnp.ndarray) -> jnp.ndarray:
         """Forward transform."""
         return cls.__call__(x)
@@ -71,12 +71,13 @@ def uniformity_divergence_score(sorted_xs: jnp.ndarray) -> float:
     return score
 
 
-def best_transform(xs: jnp.ndarray,
-                   xmin: float = -math.inf,
-                   xmax: float = math.inf,
-                   transforms: Tuple[Transform] = (Identity, Log, Symlog1p),
-                   divergence_fn=uniformity_divergence_score,
-                   ):
+def best_transform(
+    xs: jnp.ndarray,
+    xmin: float = -math.inf,
+    xmax: float = math.inf,
+    transforms: tuple[Transform] = (Identity, Log, Symlog1p),
+    divergence_fn=uniformity_divergence_score,
+):
     """Choose the transform that makes the distribution most uniform.
 
     PWLCurves work best when the input xs are distributed ~evenly over the domain.

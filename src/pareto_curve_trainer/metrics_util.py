@@ -1,7 +1,8 @@
 """Utilities for metrics.py."""
+
+from collections.abc import Callable
 from enum import IntEnum
-import math
-from typing import Callable, NamedTuple
+
 import jax
 import jax.numpy as jnp
 
@@ -32,6 +33,7 @@ def first_index_matching(sorted_array):
 
 class Normalization(IntEnum):
     """Monotonicity constraints suitable for curves."""
+
     NONE = 0
     UNIT_WEIGHTS = 1  # Weights average to 1.
     GROUP_UNIT_WEIGHTS = 2  # Weights average to 1 in each group.
@@ -41,7 +43,7 @@ class Normalization(IntEnum):
     GROUP_MAX_ONE_MIN_ZERO = 6  # Lowest possible score in each group is 0, highest is 1.
 
 
-def ideal_and_worst_orders(labels: jnp.ndarray, groups: None | jnp.ndarray=None) -> jnp.ndarray:
+def ideal_and_worst_orders(labels: jnp.ndarray, groups: None | jnp.ndarray = None) -> jnp.ndarray:
     """Returns the indices for the best/worst ordering for labels, optionally within groups."""
     if groups is not None:
         # lexsort is descending, so we invert the labels to sort higher labels to the top.
@@ -74,11 +76,10 @@ def normalize_group_weights_to_unit(weights: jnp.ndarray, groups: jnp.ndarray) -
 
 
 def normalize_weights_to_max_one(
-        weights: jnp.ndarray,
-        labels: jnp.ndarray,
-        groups: None | jnp.ndarray=None) -> jnp.ndarray:
+    weights: jnp.ndarray, labels: jnp.ndarray, groups: None | jnp.ndarray = None
+) -> jnp.ndarray:
     """Weights that scale a ranking metric to a maximum of 1.
-    
+
     Args:
         weights: The metric's pre-normalization weights. When the metric is evaluated on a score,
             the labels will be sorted by that score. Then the metric output is a weighted averaged
@@ -96,9 +97,8 @@ def normalize_weights_to_max_one(
 
 
 def normalize_weights_to_max_one_min_zero(
-        weights: jnp.ndarray,
-        labels: jnp.ndarray,
-        groups: None | jnp.ndarray = None) -> jnp.ndarray:
+    weights: jnp.ndarray, labels: jnp.ndarray, groups: None | jnp.ndarray = None
+) -> jnp.ndarray:
     """Weights that scale a ranking metric to a minimum of zero and a maximum of 1.
 
     Args:
@@ -125,11 +125,10 @@ def normalize_weights_to_max_one_min_zero(
 
 
 def normalize_group_weights_to_max_one(
-        weights: jnp.ndarray,
-        labels: jnp.ndarray,
-        groups:jnp.ndarray) -> jnp.ndarray:
+    weights: jnp.ndarray, labels: jnp.ndarray, groups: jnp.ndarray
+) -> jnp.ndarray:
     """Weights that scale a group ranking metric to a maximum of 1.
-    
+
     Args:
         weights: The metric's pre-normalization weights. When the metric is evaluated on a score,
             the labels will be sorted by groups first and that score second. Then the metric output
@@ -137,7 +136,7 @@ def normalize_group_weights_to_max_one(
             weights.
         labels: The float label for each row.
         groups: The int group tag for each row, corresponding to the label.
-    
+
     Returns:
         Post-normalization weights.
     """
@@ -161,11 +160,10 @@ def normalize_group_weights_to_max_one(
 
 
 def normalize_group_weights_to_max_one_min_zero(
-        weights: jnp.ndarray,
-        labels: jnp.ndarray,
-        groups: jnp.ndarray) -> jnp.ndarray:
+    weights: jnp.ndarray, labels: jnp.ndarray, groups: jnp.ndarray
+) -> jnp.ndarray:
     """Weights that scale a group ranking metric to a minimum of zero and a maximum of 1.
-    
+
     Args:
         weights: The metric's pre-normalization weights. When the metric is evaluated on a score,
             the labels will be sorted by groups first and that score second. Then the metric output
@@ -214,33 +212,34 @@ def within_group_rank(groups: jnp.ndarray) -> jnp.ndarray:
     return absolute_index - group_first_index
 
 
-def order_metric_weights(rank_to_weight: jnp.ndarray | Callable,
-                         labels: jnp.ndarray,
-                         groups: None | jnp.ndarray=None,
-                         normalize: Normalization = Normalization.GROUP_UNIT_WEIGHTS,
-                         ) -> jnp.ndarray:
+def order_metric_weights(
+    rank_to_weight: jnp.ndarray | Callable,
+    labels: jnp.ndarray,
+    groups: None | jnp.ndarray = None,
+    normalize: Normalization = Normalization.GROUP_UNIT_WEIGHTS,
+) -> jnp.ndarray:
     """Calculate the weights for an order metric.
-        
-        Args:
-            rank_to_weight: Maps a row's position (after sorting) to its corresponding weight.
-                If groups are present, then the position is measured within its group.
-                `rank_to_weight` can either be a function or an array. If a function, it must map
-                every position index to a weight float. If an array, any position index that
-                exceeds the array's bounds will be mapped to a weight of 0.
-                This should normally be a monotonically decreasing function, such that a
-                higher rank index (i.e. a worse rank) always corresponds to a lower weight.
-            labels: 1D floats. Ground truth for each row of data.
-            groups: Optional 1D ints, used for group metrics. Rows i and j are in the same group
-                iff groups[i] == groups[j]. `groups` must be ordered to match labels, so that
-                groups[i] is the group of labels[i].
-            normalize: An IntEnum indicating what normalization (if any) to apply. By default, we
-                normalize the weights to an average of 1 (or a per-group average of 1 if using
-                groups).
-        
-        Returns:
-            The final weights array after (optional) grouping and (optional) normalization, whose
-            length equals the length of `labels`.
-        """
+
+    Args:
+        rank_to_weight: Maps a row's position (after sorting) to its corresponding weight.
+            If groups are present, then the position is measured within its group.
+            `rank_to_weight` can either be a function or an array. If a function, it must map
+            every position index to a weight float. If an array, any position index that
+            exceeds the array's bounds will be mapped to a weight of 0.
+            This should normally be a monotonically decreasing function, such that a
+            higher rank index (i.e. a worse rank) always corresponds to a lower weight.
+        labels: 1D floats. Ground truth for each row of data.
+        groups: Optional 1D ints, used for group metrics. Rows i and j are in the same group
+            iff groups[i] == groups[j]. `groups` must be ordered to match labels, so that
+            groups[i] is the group of labels[i].
+        normalize: An IntEnum indicating what normalization (if any) to apply. By default, we
+            normalize the weights to an average of 1 (or a per-group average of 1 if using
+            groups).
+
+    Returns:
+        The final weights array after (optional) grouping and (optional) normalization, whose
+        length equals the length of `labels`.
+    """
     if not isinstance(rank_to_weight, Callable):
         # Map anything with rank >= len(rank_to_weight) to a weight of 0.
         rank_to_weight_array = jnp.concatenate([rank_to_weight, jnp.array([0])])

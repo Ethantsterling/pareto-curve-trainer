@@ -16,8 +16,10 @@ to be as close to pareto optimal as we can, and use the crowding distance betwee
 tiebreaker to spread the chosen points out as much as we can over the frontier. (Without crowding
 distance, we'd risk gathering a cluster of pareto-optimal points in one corner of the frontier.)
 """
+
+from collections.abc import Sequence
 from enum import IntEnum
-from typing import Sequence, Tuple
+
 import jax
 import jax.numpy as jnp
 
@@ -102,7 +104,8 @@ def crowding_distance(
     *,
     exclusion_mask: jnp.ndarray | None = None,
     tiebreaker_random_key: jnp.ndarray | None = jax.random.key(12345),
-    extra_tiebreakers: Sequence[jnp.ndarray] = tuple()) -> jnp.ndarray:
+    extra_tiebreakers: Sequence[jnp.ndarray] = tuple(),
+) -> jnp.ndarray:
     """Crowding distance to reward points that are further awy from others.
 
     Adapted from Vizier's NSGA2 crowding distance, which references
@@ -172,17 +175,17 @@ def crowding_distance(
 
 class Select(IntEnum):
     """Tracking flag for which points to discard/consider/keep."""
+
     EXCLUDE = 0
     BORDER = 1
     INCLUDE = 2
 
 
 def select_by(
-    ys: jnp.ndarray,
-    target: int,
-    tiebreaker: None | jnp.ndarray = None) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    ys: jnp.ndarray, target: int, tiebreaker: None | jnp.ndarray = None
+) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Returns a trinary mask identifying the top `target` elements of ys.
-    
+
     Bins inputs into the three categories of a Select enum (EXCLUDE/BORDER/INCLUDE).
     We rank by ys (higher is better) and break ties by tiebreaker.
     INCLUDE indicates entries that unambiguously rank in the top target entires.
@@ -194,7 +197,7 @@ def select_by(
       target: Count to tag as INCLUDE, unless there's a BORDER.
       tiebreaker: Array of shape (#points,) that breaks ties in selection when
         ys[i] == ys[j]. Higher is better.
-  
+
     Returns:
       An output array of shape (#metrics,) of Select int enums.
       * `output == Select.INCLUDE` for <= `target` values, indicating they're
@@ -218,8 +221,7 @@ def select_by(
     cutofftiebreaker = tiebreaker[cutoffindex]
 
     # Bool arrays.
-    include = ((ys > cutoffnumber) |
-              ((ys == cutoffnumber) & (tiebreaker > cutofftiebreaker)))
+    include = (ys > cutoffnumber) | ((ys == cutoffnumber) & (tiebreaker > cutofftiebreaker))
     border = (ys == cutoffnumber) & (tiebreaker == cutofftiebreaker)
     # If the 'border' actually has a perfect cutoff, then actually the entire
     # 'border' should just be INCLUDE and there should be no BORDER.
@@ -233,10 +235,11 @@ def select_by(
 
 
 # @jax.jit(static_argnames='target_size')
-def select(scores: jnp.ndarray,   # 2D array of metric x point
-           target_size: int,      # Number of indices to return
-           priority_score: jnp.ndarray | None=None,
-           )-> jnp.ndarray:
+def select(
+    scores: jnp.ndarray,  # 2D array of metric x point
+    target_size: int,  # Number of indices to return
+    priority_score: jnp.ndarray | None = None,
+) -> jnp.ndarray:
     """Applies survival process.
 
     Sorted all points by 3-tuple
@@ -281,14 +284,11 @@ def select(scores: jnp.ndarray,   # 2D array of metric x point
     # NOTE: this differs from visier NSGA2, which ignores domination both by
     # INCLUDE and EXCLUDE rows. In my opinion, it makes sense to count domination
     # by INCLUDE rows.
-    pareto_ranks = pareto_rank_with_exclusion(
-        scores, exclusion_mask=selection != Select.EXCLUDE)
+    pareto_ranks = pareto_rank_with_exclusion(scores, exclusion_mask=selection != Select.EXCLUDE)
 
     # Select all INCLUDE and select the least-dominated points from BORDER.
     # Use -pareto_ranks so that less-dominated points rank higher.
-    selection = select_by(
-        selection, target=target_size, tiebreaker=-pareto_ranks
-    )
+    selection = select_by(selection, target=target_size, tiebreaker=-pareto_ranks)
 
     # Measure crowding distance to reward points that are more spread out on the
     # pareto frontier. A higher distance is better.
@@ -299,7 +299,9 @@ def select(scores: jnp.ndarray,   # 2D array of metric x point
         extra_tiebreakers=[pareto_ranks],
     )
     selection = select_by(
-        selection, target=target_size, tiebreaker=distance,
+        selection,
+        target=target_size,
+        tiebreaker=distance,
     )
     # The crowding_distance should settle the border, so selection should now
     # consist exclusively of 2's and 0's.

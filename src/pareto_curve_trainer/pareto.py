@@ -26,17 +26,20 @@ training saturates very early there's probably something wrong, whereas if train
 then we likely need to train longer.) In the multiobjective case, we can plot hypervolume for the
 same purpose.
 """
+
 import math
+
 import jax
 import jax.numpy as jnp
+
 
 ###########################################################
 # CPU-based pareto, suitable for sparse pareto frontiers. #
 ###########################################################
 def _dominated_by(
-      points: jnp.ndarray,  # (num_points, num_dimensions)
-      p: jnp.ndarray,       # (num_dimension,)
-      ) -> jnp.ndarray:
+    points: jnp.ndarray,  # (num_points, num_dimensions)
+    p: jnp.ndarray,  # (num_dimension,)
+) -> jnp.ndarray:
     """Mark points dominated by p."""
     better_on_some_metric = jnp.any(p > points, axis=-1)
     not_worse_on_any_metric = jnp.all(p >= points, axis=-1)
@@ -50,7 +53,7 @@ def _dominated_by(
 @jax.jit
 def _pareto(points: jnp.array) -> jnp.array:
     """Returns a boolean mask for the pareto-optimal points.
-    
+
     This algorithm exploits the sparseness of pareto optimal points, so it's efficient in the usual
     case where few points are pareto optimal.
     If instead a large fraction of points are pareto optimal, you're better off using a more
@@ -61,40 +64,40 @@ def _pareto(points: jnp.array) -> jnp.array:
     # For each point that isn't already marked as dominated,
     # mark each point as dominated that that point dominates.
     def _prefix_pareto_one_step(i, val):
-        dominated, = val
+        (dominated,) = val
 
         new_dominated = jax.lax.cond(
-          pred=dominated[i],  # Skip to the next point if the current point is dominated.
-          true_fun=lambda: dominated,
-          false_fun=lambda: dominated | _dominated_by(points, points[i]),
+            pred=dominated[i],  # Skip to the next point if the current point is dominated.
+            true_fun=lambda: dominated,
+            false_fun=lambda: dominated | _dominated_by(points, points[i]),
         )
         return (new_dominated,)
 
-    final_dominated, = jax.lax.fori_loop(
+    (final_dominated,) = jax.lax.fori_loop(
         lower=0,
         upper=len(points),
         body_fun=_prefix_pareto_one_step,
         init_val=(dominated,),
-        )
+    )
     return ~final_dominated
 
 
 def pareto(points: jnp.array) -> jnp.array:
     """Returns a boolean mask for the pareto-optimal points.
-    
+
     A CPU algorithm that exploits the sparseness of pareto optimal points. Efficient in the usual
     case where few points are pareto optimal.
     If instead a large fraction of points are pareto optimal, you're better off using a more
     parallelized algorithm that's tuned for GPU.
     """
-    cpu = jax.devices('cpu')[0]
+    cpu = jax.devices("cpu")[0]
     points = jax.device_put(points, cpu)
     return _pareto(points)
 
 
 def prefix_pareto(points: jnp.ndarray) -> jnp.ndarray:
     """Returns a boolean mask of the points that aren't dominated by any earlier point.
-    
+
     True for points[i] if points[i] is on the pareto frontier of points[:i+1].
     This algorithm exploits the sparseness of pareto optimal points, so it's efficient in the usual
     case where few points are pareto optimal.
@@ -113,7 +116,7 @@ def prefix_pareto(points: jnp.ndarray) -> jnp.ndarray:
 ##########################################################
 def _pick_batch_size_for_pareto(points: jnp.ndarray, max_ram=1_000_000_000) -> jnp.ndarray:
     """Pick an appropriate power-of-two batch size for pareto operations.
-    
+
     Fully vectorized pareto calculation costs O(n^2) RAM, which is often too much.
     Going point by point only costs O(n) RAM, but limits our ability to parallelize computation.
     Batching is a compromise that gives us space for parallelization without overflowing RAM.
@@ -131,9 +134,9 @@ def _pick_batch_size_for_pareto(points: jnp.ndarray, max_ram=1_000_000_000) -> j
 
 
 def _point_first_dominating(
-      points: jnp.ndarray,  # (num_points, num_dimensions)
-      p: jnp.ndarray,       # (num_dimension,)
-      ) -> int:
+    points: jnp.ndarray,  # (num_points, num_dimensions)
+    p: jnp.ndarray,  # (num_dimension,)
+) -> int:
     """Returns the index of the first point in points that dominates p.
 
     Returns len(points) if p is pareto-optimal."""
@@ -148,10 +151,11 @@ def _point_first_dominating(
 def _make_first_dominating_point_fn_for_map(points: jnp.ndarray):
     def first_dominating_point(p: jnp.ndarray) -> int:
         return _point_first_dominating(points, p)
+
     return first_dominating_point
 
 
-@jax.jit(static_argnames=('batch_size'))
+@jax.jit(static_argnames=("batch_size"))
 def first_dominating_batched(points: jnp.ndarray, batch_size) -> jnp.ndarray:
     """Output[i] is the index of the first point dominating points[i]."""
     first_dominating_fn = _make_first_dominating_point_fn_for_map(points)
@@ -160,7 +164,7 @@ def first_dominating_batched(points: jnp.ndarray, batch_size) -> jnp.ndarray:
 
 def first_dominating(points: jnp.ndarray) -> jnp.ndarray:
     """output[i] is the index of the first point dominating points[i].
-    
+
     If no point dominates points[i], then output[i] is len(points)."""
     batch_size = _pick_batch_size_for_pareto(points)
     return first_dominating_batched(points, batch_size)
@@ -168,7 +172,7 @@ def first_dominating(points: jnp.ndarray) -> jnp.ndarray:
 
 def prefix_pareto_dense(points: jnp.ndarray) -> jnp.ndarray:
     """Returns a boolean mask of the points that aren't dominated by any earlier point.
-    
+
     True for points[i] if points[i] is on the pareto frontier of points[:i+1].
     Optimized for GPU. Effective even for dense pareto frontiers.
     """
@@ -177,8 +181,8 @@ def prefix_pareto_dense(points: jnp.ndarray) -> jnp.ndarray:
 
 def _is_point_pareto(
     points: jnp.ndarray,  # (num_points, num_dimensions)
-    p: jnp.ndarray,       # (num_dimension,)
-    ) -> bool:
+    p: jnp.ndarray,  # (num_dimension,)
+) -> bool:
     """Check if one point is pareto optimal within an array of points."""
     better_on_some_metric = jnp.any(p > points, axis=-1)
     duplicate = jnp.all(p == points, axis=-1)
@@ -188,10 +192,11 @@ def _is_point_pareto(
 def _make_point_pareto_fn_for_map(points: jnp.ndarray):
     def point_is_pareto(p: jnp.ndarray) -> int:
         return _is_point_pareto(points, p)
+
     return point_is_pareto
 
 
-@jax.jit(static_argnames=('batch_size'))
+@jax.jit(static_argnames=("batch_size"))
 def _is_pareto_map_batched(points: jnp.ndarray, batch_size) -> jnp.ndarray:
     """Pareto calculation O(n^2) runtime but O(n) memory."""
     p_pareto_fn = _make_point_pareto_fn_for_map(points)
@@ -200,7 +205,7 @@ def _is_pareto_map_batched(points: jnp.ndarray, batch_size) -> jnp.ndarray:
 
 def pareto_dense(points: jnp.ndarray) -> jnp.ndarray:
     """Pareto calculation O(n^2) runtime but O(n) memory.
-    
+
     Optimized for GPU. Effective even for dense pareto frontiers.
     """
     # Allow up to 1GB of ram for batching.
@@ -242,9 +247,8 @@ def unit_hyperoctant_volume(dimension):
     relative measure rather than caring about its absolute meaning, but by
     including this term we make it robust just in case.
     """
-    return (math.pi**(dimension / 2) /
-            math.gamma(dimension / 2 + 1) /
-            2**dimension)
+    return math.pi ** (dimension / 2) / math.gamma(dimension / 2 + 1) / 2**dimension
+
 
 def _prefix_dominated_hypervolume(points, vectors):
     """Assumes an origin at zero, and few enough vectors to fit intermediates in RAM."""
@@ -253,7 +257,7 @@ def _prefix_dominated_hypervolume(points, vectors):
     # Treat each vector's depth as the radius of a hyperoctant.
     # The hyperoctant is an estimate of the total hypervolume.
     dimension = points.shape[-1]
-    hyper_octant_volume = depths ** dimension * unit_hyperoctant_volume(dimension)
+    hyper_octant_volume = depths**dimension * unit_hyperoctant_volume(dimension)
     # Our estimated hypervolume is the average of the hyperoctants.
     # (#points, #vectors) --> (#vectors,)
     return jnp.mean(hyper_octant_volume, axis=0)
@@ -273,11 +277,13 @@ def _batch_size(points, max_ram, max_batch_size):
 
 
 @jax.jit(static_argnames=("num_vectors_pow",))
-def prefix_dominated_hypervolume(pareto_points: jnp.ndarray,
-                                 origin: jnp.ndarray,
-                                 num_vectors_pow: int=15,
-                                 random_key=jax.random.key(95310),
-                                 max_ram=1e9) -> float:
+def prefix_dominated_hypervolume(
+    pareto_points: jnp.ndarray,
+    origin: jnp.ndarray,
+    num_vectors_pow: int = 15,
+    random_key=jax.random.key(95310),
+    max_ram=1e9,
+) -> float:
     """Approximate hypervolume dominated by each prefix of the points, with origin as baseline.
 
     This is the hypervolume of the locus of points p such that:
@@ -291,21 +297,27 @@ def prefix_dominated_hypervolume(pareto_points: jnp.ndarray,
     the choice to normalize metrics.
 
     Args:
-        pareto_points: 2D array of (#points, #metrics). For efficiency, these points
-        should all be prefix-pareto optimal. (This function won't check.)
+        pareto_points: 2D array of (#points, #metrics). This function is most efficient when the
+            points are prefix-pareto optimal  For efficiency, these points
+            should all be prefix-pareto optimal. (This function still works with non-pareto points,)
         origin: 1D array of (metrics,) used as the baseline against which we
-        measure hypervolume.
+            measure hypervolume.
         num_vectors_pow: We'll generate 2**num_vectors_pow and use each one to
-        approximate the hypervolume. We insist on a power of two for convenience
-        of batching. More vectors --> paying more compute for more accuracy.
+            approximate the hypervolume. We insist on a power of two for convenience
+            of batching. More vectors --> paying more compute for more accuracy.
         random_key: The key for generating the vectors.
+    Returns:
+        1D array where [i] is the approximate hypervolume dominated by pareto_points[:i+1].
+        The final entry of the array is the hypervolume dominated by all the points together.
     """
     if num_vectors_pow < 0:
         raise ValueError(f"num_vectors_pow must be a positive integer, got {num_vectors_pow}.")
     if num_vectors_pow > 20:
-        raise ValueError(f"num_vectors_pow={num_vectors_pow} is too high. A reasonable range is " 
-                         "10-20 (i.e. 2**10 to 2**20 vectors) to ensure a reasonably accurate " \
-                         "approximation for a reasonable amount of compute.")
+        raise ValueError(
+            f"num_vectors_pow={num_vectors_pow} is too high. A reasonable range is "
+            "10-20 (i.e. 2**10 to 2**20 vectors) to ensure a reasonably accurate "
+            "approximation for a reasonable amount of compute."
+        )
     origin = jnp.array(origin, dtype=float)
     assert origin.shape == (pareto_points.shape[1],), "origin must have the same shape as a point."
     pareto_points -= origin
@@ -330,17 +342,18 @@ def prefix_dominated_hypervolume(pareto_points: jnp.ndarray,
 
     def average_hypervolume(i, val):
         vector_slice = jax.lax.dynamic_slice_in_dim(
-            vectors,
-            start_index=i * batch_size,
-            slice_size=batch_size)
+            vectors, start_index=i * batch_size, slice_size=batch_size
+        )
 
         new_hypervolume = _prefix_dominated_hypervolume(pareto_points, vector_slice)
         return val + new_hypervolume / num_batches
 
     prefix_hypervolumes = jax.lax.fori_loop(
-        0, num_batches,
+        0,
+        num_batches,
         body_fun=average_hypervolume,
-        init_val=jnp.zeros(len(pareto_points), dtype=float))
+        init_val=jnp.zeros(len(pareto_points), dtype=float),
+    )
     # When we normalized the metrics, we divided the hypervolume by the normalization factors.
     # Now we multiply by those factors to restore the true hypervolume.
     return prefix_hypervolumes * multiplier

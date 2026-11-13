@@ -1,9 +1,10 @@
-"""A trainable scalar 
+"""A trainable scalar
 Training wrappers around 0D, 1D, and 2D functions that include training
 constraints such as bounds for parameters, monotonicity, etc.
 
 This one represents a vector of variations of one scalar.
 """
+
 from typing import NamedTuple, Self
 
 import jax
@@ -14,6 +15,7 @@ import pareto_curve_trainer.component_utils as cu
 
 class Scalar(NamedTuple):
     """A vectorized, trainable component representing variants of a scalar parameter."""
+
     s: jax.typing.ArrayLike
     smin: jax.typing.ArrayLike
     smax: jax.typing.ArrayLike
@@ -31,7 +33,7 @@ class Scalar(NamedTuple):
     def value(self) -> jnp.ndarray:
         """Convert to a 1 x n array to support operations against 1D arrays."""
         if jnp.ndim(self.s) == 1:
-            return jnp.reshape(self.s, shape=(-1,1))
+            return jnp.reshape(self.s, shape=(-1, 1))
         return self.s
 
     def merge(self, other) -> Self:
@@ -47,11 +49,13 @@ class Scalar(NamedTuple):
         return len(self.s) if jnp.ndim(self.s) else 1
 
     def constraints_equal(self, other):
-        """Returns whether the constraints """
-        return ((jnp.shape(self.smin) == jnp.shape(other.smin)) &
-                (jnp.shape(self.smax) == jnp.shape(other.smax)) &
-                jnp.all(self.smin == other.smin) &
-                jnp.all(self.smax == other.smax))
+        """Returns whether the constraints"""
+        return (
+            (jnp.shape(self.smin) == jnp.shape(other.smin))
+            & (jnp.shape(self.smax) == jnp.shape(other.smax))
+            & jnp.all(self.smin == other.smin)
+            & jnp.all(self.smax == other.smax)
+        )
 
     def __eq__(self, other: Self):
         s_identical = (jnp.shape(self.s) == jnp.shape(other.s)) & jnp.all(self.s == other.s)

@@ -1,26 +1,31 @@
 """Tests for population.py."""
+
 # pylint: disable=missing-function-docstring
 # pylint: disable=protected-access
 # pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
+
 os.environ["JAX_PLATFORMS"] = "cpu"
 import jax
 import jax.numpy as jnp
-from pareto_curve_trainer import population
-from pareto_curve_trainer import example_fixtures
+
+from pareto_curve_trainer import example_fixtures, population
 
 # Ensure jittability in these tests.
 Population = jax.jit(population.Population)
 
 
 def test_extend_array():
-    assert jnp.array_equal(population._extend_array(jnp.array([1, 2, 3]), 6),
-                           jnp.array([1,2,3,1,2,3]))
-    _test_array = jnp.array([(1,2), (3,4), (5,6)])
-    assert jnp.array_equal(population._extend_array(_test_array, 2), jnp.array([(1,2), (3,4)]))
-    assert jnp.array_equal(population._extend_array(_test_array, 5),
-                           jnp.array([(1,2), (3,4), (5,6), (1,2), (3,4)]))
+    assert jnp.array_equal(
+        population._extend_array(jnp.array([1, 2, 3]), 6), jnp.array([1, 2, 3, 1, 2, 3])
+    )
+    _test_array = jnp.array([(1, 2), (3, 4), (5, 6)])
+    assert jnp.array_equal(population._extend_array(_test_array, 2), jnp.array([(1, 2), (3, 4)]))
+    assert jnp.array_equal(
+        population._extend_array(_test_array, 5),
+        jnp.array([(1, 2), (3, 4), (5, 6), (1, 2), (3, 4)]),
+    )
 
 
 test_population = Population(jnp.array([1]), example_fixtures.test_components)
@@ -34,7 +39,7 @@ def test_population_equality():
 
 def test_filled_size():
     assert filled_test_population.num_trials() == 5
-    assert jnp.array_equal(filled_test_population.trial_ids, jnp.array([1,2,3,4,5]))
+    assert jnp.array_equal(filled_test_population.trial_ids, jnp.array([1, 2, 3, 4, 5]))
     assert filled_test_population.max_trial_id() == 5
 
 

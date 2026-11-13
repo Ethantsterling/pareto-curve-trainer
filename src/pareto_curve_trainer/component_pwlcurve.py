@@ -1,47 +1,49 @@
 """A trainable vectorized piecewise-linear-curve component and supporting functions."""
+
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
-from typing import Callable, List, NamedTuple, Self, Tuple
+from typing import NamedTuple, Self
+
 import jax
 import jax.numpy as jnp
+
 import pareto_curve_trainer.component_utils as cu
-from pareto_curve_trainer.component_utils import Mono
 from pareto_curve_trainer import transforms
+from pareto_curve_trainer.component_utils import Mono
 
 
-def jax_curve_slopes(
-    curve_xs: jnp.ndarray,
-    curve_ys: jnp.ndarray) -> jnp.ndarray:
+def jax_curve_slopes(curve_xs: jnp.ndarray, curve_ys: jnp.ndarray) -> jnp.ndarray:
     """The slopes for a single curve."""
-    slopes = ((curve_ys[1:] - curve_ys[:-1]) /
-              (curve_xs[1:] - curve_xs[:-1]))
+    slopes = (curve_ys[1:] - curve_ys[:-1]) / (curve_xs[1:] - curve_xs[:-1])
     return jnp.concatenate([jnp.array([0]), slopes])
 
 
-@partial(jax.jit, static_argnames=['fx'])
+@partial(jax.jit, static_argnames=["fx"])
 def jax_curve_eval(
     curve_xs: jnp.ndarray,
     curve_ys: jnp.ndarray,
     xs: jnp.ndarray,
-    fx: Callable[[jnp.ndarray], jnp.ndarray] | None = None) -> jnp.ndarray:
+    fx: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
+) -> jnp.ndarray:
     """Functional style of curve eval, forgoing curve objects.
 
-      JAX expects a functional style whereas PWLCurve is written object-oriented,
-      so this is a functional evaluator for pwlcurves. Presumably we'd call this
-      or a jitted function like it from the object-oriented version's .eval().
+    JAX expects a functional style whereas PWLCurve is written object-oriented,
+    so this is a functional evaluator for pwlcurves. Presumably we'd call this
+    or a jitted function like it from the object-oriented version's .eval().
 
-      TODO: add an fx transform. We can do that with a static argument. That'll
-      force us to jit multiple times, one for each fx argument, but that's fine.
-      There aren't many different fx's that we use anyway.
-      use to re-jit every time we change the fx argument, but that's fine.
-      It's not like we'll use that many different fx's.
+    TODO: add an fx transform. We can do that with a static argument. That'll
+    force us to jit multiple times, one for each fx argument, but that's fine.
+    There aren't many different fx's that we use anyway.
+    use to re-jit every time we change the fx argument, but that's fine.
+    It's not like we'll use that many different fx's.
 
-      Args:
-        xs: 1D JAX array of data to evaluate the curve on.
+    Args:
+      xs: 1D JAX array of data to evaluate the curve on.
 
-      Returns:
-        1D JAX array of the PWLCurve's value at each x in xs.
-      """
+    Returns:
+      1D JAX array of the PWLCurve's value at each x in xs.
+    """
     xs = jnp.clip(xs, curve_xs[0], curve_xs[-1])
 
     if fx is not None:
@@ -59,8 +61,7 @@ def jax_curve_eval(
     return knot_y - xgap * slope
 
 
-def jax_curves_slopes(curves_xs: jnp.ndarray,
-                      curves_ys: jnp.ndarray) -> jnp.ndarray:
+def jax_curves_slopes(curves_xs: jnp.ndarray, curves_ys: jnp.ndarray) -> jnp.ndarray:
     """Calculate the slopes of a vector of curves.
 
     # Suppose we have a curve with 3 knots. Searchsorted can return 4 positions:
@@ -68,7 +69,7 @@ def jax_curves_slopes(curves_xs: jnp.ndarray,
       # 1 (cxs[0] < x <= cxs[1])
       # 2 (cxs[1] < x <= cxs[2])
       # 3 (cxs[2] < x)
-    
+
     Args:
       curve_xs: (num_curves, curve_size) 2D array of knot-x floats.
       curve_ys: (num_curves, curve_size) 2D array of knot-y floats.
@@ -81,8 +82,7 @@ def jax_curves_slopes(curves_xs: jnp.ndarray,
     """
     assert jnp.ndim(curves_xs) == 2 == jnp.ndim(curves_ys)
     # The slopes between knots.
-    slopes = ((curves_ys[:, 1:] - curves_ys[:, :-1]) /
-              (curves_xs[:, 1:] - curves_xs[:, :-1]))
+    slopes = (curves_ys[:, 1:] - curves_ys[:, :-1]) / (curves_xs[:, 1:] - curves_xs[:, :-1])
     # Set the preceding slope and trailing slope to zero.
     return jnp.pad(slopes, ((0, 0), (1, 1)))
 
@@ -92,24 +92,25 @@ def jax_curves_eval(
     curves_xs: jnp.ndarray,  # 2D, num_curves x num_points_per_curve
     curves_ys: jnp.ndarray,  # 2D, num_curves x num_points_per_curve
     xs: jnp.ndarray,  # 1D
-    fx: Callable[[jnp.ndarray], jnp.ndarray] | None = None) -> jnp.ndarray:
+    fx: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
+) -> jnp.ndarray:
     """Functional style of curve eval, forgoing curve objects.
 
-      JAX expects a functional style whereas PWLCurve is written object-oriented,
-      so this is a functional evaluator for pwlcurves. Presumably we'd call this
-      or a jitted function like it from the object-oriented version's .eval().
+    JAX expects a functional style whereas PWLCurve is written object-oriented,
+    so this is a functional evaluator for pwlcurves. Presumably we'd call this
+    or a jitted function like it from the object-oriented version's .eval().
 
-      TODO: add an fx transform. We can do that with a static argument. That'll
-      force us to jit multiple times, one for each fx argument, but that's fine.
-      There aren't many different fx's that we use anyway.
-      use to re-jit every time we change the fx argument, but that's fine.
-      It's not like we'll use that many different fx's.
+    TODO: add an fx transform. We can do that with a static argument. That'll
+    force us to jit multiple times, one for each fx argument, but that's fine.
+    There aren't many different fx's that we use anyway.
+    use to re-jit every time we change the fx argument, but that's fine.
+    It's not like we'll use that many different fx's.
 
-      Args:
-        xs: Data to evaluate the curve on. 1D JAX array.
+    Args:
+      xs: Data to evaluate the curve on. 1D JAX array.
 
-      Returns:
-        1D JAX array of the PWLCurve's value at each x in xs.
+    Returns:
+      1D JAX array of the PWLCurve's value at each x in xs.
     """
     if fx is not None:
         xs = fx(xs)
@@ -141,6 +142,7 @@ def jax_curves_eval(
 
 class StructPwlcurve(NamedTuple):
     """A single PWLCurve. Not vectorized."""
+
     xs: jnp.ndarray
     ys: jnp.ndarray
     fx: Callable[[jnp.ndarray], jnp.ndarray] | None = None
@@ -151,7 +153,7 @@ class StructPwlcurve(NamedTuple):
 
     def __str__(self):
         points = list(zip(self.xs.tolist(), self.ys.tolist()))
-        if self.fx is None or self.fx.__name__ == 'identity':
+        if self.fx is None or self.fx.__name__ == "identity":
             return f"PWLCurve({points})"
         return f"PWLCurve({points}, fx={self.fx.__name__})"
 
@@ -160,13 +162,14 @@ class StructPwlcurve(NamedTuple):
 @dataclass
 class Pwlcurve:
     """A vectorized, trainable component representing variants of a pwlcurve."""
-    xs: jnp.ndarray    # 2D num_curves x curve_size floats
-    ys: jnp.ndarray    # 2D num_curves x curve_size floats
+
+    xs: jnp.ndarray  # 2D num_curves x curve_size floats
+    ys: jnp.ndarray  # 2D num_curves x curve_size floats
     xmin: float  # jnp.ndarray  # 1D floats
     xmax: float  # jnp.ndarray  # 1D floats
     ymin: float  # jnp.ndarray  # 1D floats
     ymax: float  # jnp.ndarray  # 1D floats
-    mono: Mono   # jnp.ndarray  # 1D array of ints representing the Mono enum values.
+    mono: Mono  # jnp.ndarray  # 1D array of ints representing the Mono enum values.
     fx: Callable[[jnp.ndarray], jnp.ndarray] | None = jax.tree.static(default=None)
 
     def eval(self, data: jnp.ndarray) -> jnp.ndarray:
@@ -205,10 +208,9 @@ class Pwlcurve:
             mono=jnp.concatenate([self.mono, other.mono]),
         )
 
-    def as_struct_pwlcurves(self) -> List[StructPwlcurve]:
+    def as_struct_pwlcurves(self) -> list[StructPwlcurve]:
         """Returns a list of single pwlcurves without training constraints."""
-        return [StructPwlcurve(xarray, yarray) for
-                (xarray, yarray) in zip(self.xs, self.ys)]
+        return [StructPwlcurve(xarray, yarray) for (xarray, yarray) in zip(self.xs, self.ys)]
 
     # NamedTuple uses __len__ so we can't override that.
     def num_rows(self) -> int:
@@ -217,32 +219,40 @@ class Pwlcurve:
 
     def constraints_equal(self, other):
         """Check if this component's constraints match another component's."""
-        return (jnp.all(self.xmin == other.xmin) &
-                jnp.all(self.xmax == other.xmax) &
-                jnp.all(self.ymin == other.ymin) &
-                jnp.all(self.ymax == other.ymax) &
-                jnp.all(self.mono == other.mono))
+        return (
+            jnp.all(self.xmin == other.xmin)
+            & jnp.all(self.xmax == other.xmax)
+            & jnp.all(self.ymin == other.ymin)
+            & jnp.all(self.ymax == other.ymax)
+            & jnp.all(self.mono == other.mono)
+        )
 
     def __eq__(self, other):
-        return (jnp.all(self.xs == other.xs) &
-                jnp.all(self.ys == other.ys) &
-                self.constraints_equal(other))
+        return (
+            jnp.all(self.xs == other.xs)
+            & jnp.all(self.ys == other.ys)
+            & self.constraints_equal(other)
+        )
 
 
-def pwlcurve_from_data(xs: jnp.ndarray,
-                       num_segments: int,
-                       ymin: int=0,
-                       ymax: int=1,
-                       mono=Mono.NON_MONO,
-                       x_clip_frac: float|None=None,
-                       fx: None | transforms.Transform | Tuple[transforms.Transform] =
-                        (transforms.Identity, transforms.Log, transforms.Symlog1p),
-                       ) -> Pwlcurve:
+def pwlcurve_from_data(
+    xs: jnp.ndarray,
+    num_segments: int,
+    ymin: int = 0,
+    ymax: int = 1,
+    mono=Mono.NON_MONO,
+    x_clip_frac: float | None = None,
+    fx: None | transforms.Transform | tuple[transforms.Transform] = (
+        transforms.Identity,
+        transforms.Log,
+        transforms.Symlog1p,
+    ),
+) -> Pwlcurve:
     """Initialize a pwlcurve that infers xmin, xmax, and fx from data.
-        
+
     Args:
         xs: The intended input for the pwlcurve.
-        num_segments: The number of distinct linear sections 
+        num_segments: The number of distinct linear sections
         ymin: The minimum output constraint for the pwlcurve, which will be maintained in training.
         ymax: The maximum output constraint for the pwlcurve, which will be maintained in training.
         mono: The monotonicity constraint for the pwlcurve, which will be maintained in training.
@@ -250,7 +260,7 @@ def pwlcurve_from_data(xs: jnp.ndarray,
             and the transform. Potentially useful if there are severe outliers.
         fx: A specified Transform, or a tuple of Transform for this function to choose between
             based on how well they even out the distribution of xs.
-    
+
     Results:
         A trainable Pwlcurve with reasonable constraints and initial configuration for the data.
     """
@@ -291,7 +301,6 @@ def pwlcurve_from_data(xs: jnp.ndarray,
     if fx is not None and not isinstance(fx, transforms.Transform):
         fx = transforms.best_transform(xs, xmin=xmin, xmax=xmax, transforms=fx)
 
-    return Pwlcurve(xs=curve_xs, ys=curve_ys,
-                    xmin=xmin, xmax=xmax,
-                    ymin=ymin, ymax=ymax,
-                    mono=mono, fx=fx)
+    return Pwlcurve(
+        xs=curve_xs, ys=curve_ys, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, mono=mono, fx=fx
+    )

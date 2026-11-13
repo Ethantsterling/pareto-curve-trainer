@@ -1,8 +1,11 @@
 """Multiobjective population training."""
+
 import inspect
-from typing import Dict, NamedTuple, Tuple
+from typing import NamedTuple
+
 import jax
 import jax.numpy as jnp
+
 from pareto_curve_trainer.population import Population
 from pareto_curve_trainer.selection import select
 
@@ -14,6 +17,7 @@ def _one_trial_metrics_fn(xs, model_fn, metrics_fn):
     This reduces memory costs from O(#population * #xs) to O(#xs), which allows us to use
     large populations without worrying about exceeding the memory.
     """
+
     def mapped_fn(trial_components):
         new_predictions = model_fn(trial_components, xs)
         new_population_metrics = metrics_fn(xs, new_predictions)
@@ -26,11 +30,13 @@ def _metrics_fn_as_pytree(metrics_fn):
     class _WrappedMetric(NamedTuple):
         def __call__(self, xs, predictions):
             return metrics_fn(xs, predictions)
+
     return _WrappedMetric()
+
 
 def _population_train_one_step(
     *,
-    xs: Dict[str, jnp.ndarray],
+    xs: dict[str, jnp.ndarray],
     population: Population,
     population_metrics: jnp.ndarray,  #  2D (population_size, num_metrics) array
     metrics_fn,  # Function that evalutes and returns our metrics.
@@ -38,7 +44,7 @@ def _population_train_one_step(
     update_scale: float,
     next_trial_id: int,
     random_key: jax.Array,
-    ) -> Tuple[Population, jnp.ndarray, jnp.ndarray, int]:
+) -> tuple[Population, jnp.ndarray, jnp.ndarray, int]:
     """Grows, mutates, and culls the population."""
     new_population, new_key = population.perturbed(update_scale, random_key, first_id=next_trial_id)
     max_trial_id = new_population.max_trial_id()
@@ -74,18 +80,18 @@ def _population_train_one_step(
 
 
 # @jax.jit(static_argnames=['metrics_fn', 'model_fn'])
-@jax.jit(static_argnames=['model_fn'])
+@jax.jit(static_argnames=["model_fn"])
 def _jitted_population_train(
     *,
-    xs: Dict[str, jnp.ndarray],
+    xs: dict[str, jnp.ndarray],
     population: Population,  # This must be already filled.
-    metrics_fn, #: Metrics callable that knows where in xs to find the labels.
+    metrics_fn,  #: Metrics callable that knows where in xs to find the labels.
     model_fn,
     num_steps: int = 100,
     max_scale: float = 0.1,
     scale_progression: float = 1.0,
     random_key: jax.Array = jax.random.key(12345),
-    ) -> Tuple[Population, jnp.ndarray]:  # No need to return the updated random key IMO.
+) -> tuple[Population, jnp.ndarray]:  # No need to return the updated random key IMO.
     """Returns the trained curves and also the associated metric score. Jitted for performance."""
     scale = max_scale
 
@@ -106,8 +112,9 @@ def _jitted_population_train(
             metrics_fn=metrics_fn,
             model_fn=model_fn,
             update_scale=scale,
-            next_trial_id=max_trial_id+1,
-            random_key=random_key)
+            next_trial_id=max_trial_id + 1,
+            random_key=random_key,
+        )
 
         scale *= scale_progression
         return new_population, new_population_metrics, scale, new_key, max_trial_id
@@ -124,16 +131,18 @@ def _jitted_population_train(
     # are also modest. Even a large training run (1M trials, many components) would take a few GB
     # at most for the history.
     population, population_metrics, scale, random_key, max_trial_id = jax.lax.fori_loop(
-        0, num_steps - 1,  # The first batch is the initial population.
+        0,
+        num_steps - 1,  # The first batch is the initial population.
         _train_one_step,
-        (population, population_metrics, scale, random_key, max_trial_id))
+        (population, population_metrics, scale, random_key, max_trial_id),
+    )
 
     return population, population_metrics
 
 
 def population_train(
     *,
-    xs: Dict[str, jnp.ndarray],
+    xs: dict[str, jnp.ndarray],
     population: Population,
     metrics_fn,
     model_fn,
@@ -142,11 +151,11 @@ def population_train(
     max_scale: float = 0.1,
     min_scale: float = 0.01,
     random_key: jax.Array = jax.random.key(12345),
-    ) -> Tuple[Population, jnp.ndarray]:
+) -> tuple[Population, jnp.ndarray]:
     """A non-jitted wrapper that sets up and runs a population-based training."""
     if inspect.isfunction(metrics_fn):
         metrics_fn = _metrics_fn_as_pytree(metrics_fn)
-    scale_progression = (min_scale / max_scale) ** (population_size/num_steps)
+    scale_progression = (min_scale / max_scale) ** (population_size / num_steps)
     population, random_key = population.fill(fill_size=population_size, key=random_key)
 
     return _jitted_population_train(

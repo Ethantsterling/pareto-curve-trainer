@@ -1,14 +1,16 @@
 """Tools for analyzing a dataset before and after training."""
-from typing import List
+
 import altair as alt
 
 
-def plot_2d(df,
-            x: str,
-            y: str,
-            tooltip: List[str]=[],
-            category: None|str=None,
-            opacity_bool: None|str=None) -> alt.Chart:
+def plot_2d(
+    df,
+    x: str,
+    y: str,
+    tooltip: list[str] | None = None,
+    category: None | str = None,
+    opacity_bool: None | str = None,
+) -> alt.Chart:
     """2D interactive plot intended for pareto frontiers.
 
     After training a pareto frontier of models, it's helpful to display the metric tradeoffs
@@ -19,7 +21,7 @@ def plot_2d(df,
     B, satistfied that we're only consider cases where C is acceptably good.)
 
     Args:
-      df: A pandas dataframe 
+      df: A pandas dataframe containing all features used in the plot.
       x: Feature name such that df[x] is the x-coordinate.
       y: Feature name such that df[y] is the y-coordinate.
       tooltip: Additional feature names within df to display when hovering over a point.
@@ -28,16 +30,19 @@ def plot_2d(df,
       opacity_bool: Optional feature name to highlight True points and fade False points.
         Normally used to highlight the pareto frontier and de-emphasize dominated points.
     """
+    tooltip = [] if tooltip is None else tooltip
     # Always include these as tooltip labels.
     for label in [x, y, category, opacity_bool]:
         if label is not None and label not in tooltip:
             tooltip.append(label)
-    params = {'tooltip': tooltip,
-              'x': alt.X(x, scale=alt.Scale(zero=False)),
-              'y': alt.Y(y, scale=alt.Scale(zero=False))}
+    params = {
+        "tooltip": tooltip,
+        "x": alt.X(x, scale=alt.Scale(zero=False)),
+        "y": alt.Y(y, scale=alt.Scale(zero=False)),
+    }
     if opacity_bool is not None:
-        params['opacity'] = alt.Opacity(opacity_bool, scale=alt.Scale(range=[0.2, .8]))
+        params["opacity"] = alt.Opacity(opacity_bool, scale=alt.Scale(range=[0.2, 0.8]))
     if category:
-        params['color'] = alt.Color(category, scale=alt.Scale(scheme='dark2'))
+        params["color"] = alt.Color(category, scale=alt.Scale(scheme="dark2"))
 
     return alt.Chart(df).mark_circle(size=60).encode(**params).interactive()

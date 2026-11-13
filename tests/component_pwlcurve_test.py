@@ -1,30 +1,36 @@
 """Tests for the Pwlcurve component."""
+
 # pylint: disable=missing-function-docstring
 # pylint: disable=wrong-import-position
 # For most tests, it's quicker and cleaner to lock JAX to CPU.
 import os
+
 os.environ["JAX_PLATFORMS"] = "cpu"
-import jax  
+import jax
 import jax.numpy as jnp
+
 import pareto_curve_trainer.component_utils as cu
-from pareto_curve_trainer.component_utils import Mono
 from pareto_curve_trainer import transforms
-from pareto_curve_trainer.transforms import Identity, Log, Symlog1p
 from pareto_curve_trainer.component_pwlcurve import (
-    jax_curve_slopes, jax_curve_eval, jax_curves_slopes, jax_curves_eval, Pwlcurve,
-    pwlcurve_from_data)
+    Pwlcurve,
+    jax_curve_eval,
+    jax_curve_slopes,
+    jax_curves_eval,
+    jax_curves_slopes,
+    pwlcurve_from_data,
+)
+from pareto_curve_trainer.component_utils import Mono
+from pareto_curve_trainer.transforms import Identity, Log, Symlog1p
 
 # Ensure jittability in these tests.
 Pwlcurve = jax.jit(Pwlcurve)
 
 xs = jax.random.uniform(key=jax.random.key(123), shape=5)
 curves_xs = jnp.sort(jax.random.uniform(key=jax.random.key(124), shape=(2, 4)))
-curves_ys = jax.random.uniform(key=jax.random.key(125), shape=(2,4))
+curves_ys = jax.random.uniform(key=jax.random.key(125), shape=(2, 4))
 
-_expected_slopes = jnp.array([jax_curve_slopes(cx, cy) for
-                             cx, cy in zip(curves_xs, curves_ys)])
-_expected_evals = jnp.array([jax_curve_eval(cx, cy, xs) for
-                             cx, cy in zip(curves_xs, curves_ys)])
+_expected_slopes = jnp.array([jax_curve_slopes(cx, cy) for cx, cy in zip(curves_xs, curves_ys)])
+_expected_evals = jnp.array([jax_curve_eval(cx, cy, xs) for cx, cy in zip(curves_xs, curves_ys)])
 
 
 def test_jax_curves_slopes():
@@ -50,9 +56,11 @@ def _is_nonmono(a: jnp.array) -> bool:
 
 def test_mono_sort():
     down_ys0, up_ys1 = cu.vectorized_conditional_mono_sort(
-        curves_ys, mono=jnp.array([Mono.DOWN, Mono.UP]))
+        curves_ys, mono=jnp.array([Mono.DOWN, Mono.UP])
+    )
     nonmono_ys0, nonmono_ys1 = cu.vectorized_conditional_mono_sort(
-        curves_ys, mono=jnp.array([Mono.NON_MONO, 0]))
+        curves_ys, mono=jnp.array([Mono.NON_MONO, 0])
+    )
     assert _is_mono_down(down_ys0)
     assert _is_mono_up(up_ys1)
     # Weakness: this could fail if the initial curves happened to be nonmono.
@@ -64,10 +72,10 @@ def test_mono_sort():
 test_pwlcurve = Pwlcurve(
     xs=curves_xs,
     ys=curves_ys,
-    xmin=jnp.array([0, -1.]),
-    xmax=jnp.array([1, 2.]),
-    ymin=jnp.array([0, -1.]),
-    ymax=jnp.array([1, 2.]),
+    xmin=jnp.array([0, -1.0]),
+    xmax=jnp.array([1, 2.0]),
+    ymin=jnp.array([0, -1.0]),
+    ymax=jnp.array([1, 2.0]),
     # Note that monotonicity is enforced when perturbing/randomizing,
     # but not on curve creation.
     mono=jnp.array([Mono.DOWN, Mono.NON_MONO]),
@@ -99,10 +107,10 @@ def test_merge():
     expected_pwlcurve = Pwlcurve(
         xs=jnp.concatenate([curves_xs, curves_xs]),
         ys=jnp.concatenate([curves_ys, curves_ys]),
-        xmin=jnp.array([0, -1, 0, -1.]),
-        xmax=jnp.array([1, 2, 1, 2.]),
-        ymin=jnp.array([0, -1, 0, -1.]),
-        ymax=jnp.array([1, 2, 1, 2.]),
+        xmin=jnp.array([0, -1, 0, -1.0]),
+        xmax=jnp.array([1, 2, 1, 2.0]),
+        ymin=jnp.array([0, -1, 0, -1.0]),
+        ymax=jnp.array([1, 2, 1, 2.0]),
         mono=jnp.array([Mono.DOWN, Mono.NON_MONO, Mono.DOWN, Mono.NON_MONO]),
     )
     assert expected_pwlcurve == test_pwlcurve.merge(test_pwlcurve)
@@ -131,10 +139,12 @@ def test_pwlcurve_from_data():
 
     # y's monotonicity needs to match `mono=`.
     pwlcurve = pwlcurve_from_data(
-        x, num_segments=5, ymin=ymin, ymax=ymax, mono=Mono.UP, x_clip_frac=.2)
+        x, num_segments=5, ymin=ymin, ymax=ymax, mono=Mono.UP, x_clip_frac=0.2
+    )
     assert jnp.all(pwlcurve.ys[:, :-1] <= pwlcurve.ys[:, 1:])
     pwlcurve = pwlcurve_from_data(
-        x, num_segments=5, ymin=ymin, ymax=ymax, mono=Mono.DOWN, x_clip_frac=.1)
+        x, num_segments=5, ymin=ymin, ymax=ymax, mono=Mono.DOWN, x_clip_frac=0.1
+    )
     assert jnp.all(pwlcurve.ys[:, :-1] >= pwlcurve.ys[:, 1:])
 
 

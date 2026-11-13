@@ -1,15 +1,16 @@
 """Utilities for components."""
+
 from enum import IntEnum
-import os
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".20"
-import typing
+
 import jax
 import jax.numpy as jnp
+
 from pareto_curve_trainer.transforms import Transform
 
 
 class Mono(IntEnum):
     """Monotonicity constraints suitable for curves."""
+
     NON_MONO = 0
     UP = 1
     DOWN = 2
@@ -39,7 +40,7 @@ def _2D_merge(a1: jax.typing.ArrayLike, a2: jax.typing.ArrayLike):  # pylint: di
 # One's used for Catmap and the other for Pwlcurve, but the same operation should work for both.
 def _maybe_sorted_1d(a: jnp.ndarray, mono: Mono) -> jnp.ndarray:
     """Sort `a` to match mono's direction."""
-    print('mono is', mono)
+    print("mono is", mono)
     if mono == Mono.UP:
         return a.sort()
     if mono == Mono.DOWN:
@@ -56,24 +57,26 @@ def maybe_sorted(a: jnp.ndarray, mono: jax.typing.ArrayLike) -> jnp.ndarray:
     upsorted = a.sort()
     downsorted = jnp.flip(upsorted, axis=-1)
     mono = jnp.reshape(mono, shape=(-1, 1))
-    return jnp.where(mono == Mono.UP, upsorted,
-                    jnp.where(mono == Mono.DOWN, downsorted, a))
+    return jnp.where(mono == Mono.UP, upsorted, jnp.where(mono == Mono.DOWN, downsorted, a))
 
 
 def _conditional_mono_sort(a: jnp.ndarray, mono: Mono):
     def non_mono(a):
         return a
+
     def up(a):
         return jnp.sort(a)
+
     def down(a):
         return jnp.flip(jnp.sort(a))
+
     return jax.lax.switch(mono, [non_mono, up, down], a)
 
 
 def vectorized_conditional_mono_sort(
-    a: jnp.ndarray,    # 2D array.
-    mono: jnp.ndarray  # 1D array of int Mono enums.
-    ) -> jnp.ndarray:  # 2D array of `a` conditionally sorted.
+    a: jnp.ndarray,  # 2D array.
+    mono: jnp.ndarray,  # 1D array of int Mono enums.
+) -> jnp.ndarray:  # 2D array of `a` conditionally sorted.
     """Returns `a` where the ith row is conditionally sorted based on mono[i]."""
     return jax.vmap(_conditional_mono_sort, in_axes=(0, 0))(a, mono)
 
@@ -82,12 +85,10 @@ def vectorized_conditional_mono_sort(
 # current parameter value. Sometimes the resulting sum will exceed the parameter's
 # constraints. In that case, we'll need to constrain the parameter back to the
 # original constraints.
-
 # The easiest way is to clip the parameters like jnp.clip(x, xmin, xmax) so that
 # x < xmin --> xmin and x > xmax --> xmax. That approach greatly increases the
 # chance of a parameter reaching its exact min or max value. If this is desirable,
 # then just use jnp.clip.
-
 # However, when x is an array, there's a significant chance that multiple values
 # in x will be clipped to the same endpoint. That's inconvenient for components
 # such as pwlcurves where duplicate parameters can cause problems. (A pwlcurve's
@@ -130,7 +131,8 @@ def _perturb_array(
     min_val: jax.typing.ArrayLike,
     max_val: jax.typing.ArrayLike,
     scale: float,
-    key: jax.Array):
+    key: jax.Array,
+):
     """Underlying perturb array with no special handling of dimensions or transforms."""
     dtype = jax.dtypes.result_type(a)
     max_shift = scale * (max_val - min_val)
@@ -141,12 +143,14 @@ def _perturb_array(
     return new_a
 
 
-def _perturb_array_under_transform(a: jax.typing.ArrayLike,
-                                   min_val: jax.typing.ArrayLike,
-                                   max_val: jax.typing.ArrayLike,
-                                   scale: float,
-                                   key: jax.Array,
-                                   fx: Transform) -> jnp.ndarray:
+def _perturb_array_under_transform(
+    a: jax.typing.ArrayLike,
+    min_val: jax.typing.ArrayLike,
+    max_val: jax.typing.ArrayLike,
+    scale: float,
+    key: jax.Array,
+    fx: Transform,
+) -> jnp.ndarray:
     """Underlying perturb array with no special handling of dimensions."""
     new_trans_a = _perturb_array(fx(a), fx(min_val), fx(max_val), scale, key)
     new_a = fx.inverse(new_trans_a)
@@ -154,12 +158,14 @@ def _perturb_array_under_transform(a: jax.typing.ArrayLike,
     return jnp.clip(new_a, min=min_val, max=max_val)
 
 
-def perturb_array(a: jax.typing.ArrayLike,
-                  min_val: jax.typing.ArrayLike,
-                  max_val: jax.typing.ArrayLike,
-                  scale: float,
-                  key: jax.Array,
-                  fx: None | Transform = None) -> jnp.ndarray:
+def perturb_array(
+    a: jax.typing.ArrayLike,
+    min_val: jax.typing.ArrayLike,
+    max_val: jax.typing.ArrayLike,
+    scale: float,
+    key: jax.Array,
+    fx: None | Transform = None,
+) -> jnp.ndarray:
     """Returns `a` randomly shifted by up to scale frac of max-min.
 
     `a` should be 0, 1, or 2D, and min&max should be 0 or 1D. If min&max are 1D,
@@ -179,10 +185,12 @@ def perturb_array(a: jax.typing.ArrayLike,
     return _perturb_array_under_transform(a, min_val, max_val, scale, key, fx)
 
 
-def randomize_array(a: jax.typing.ArrayLike,    # Array of Floats
-                    min_val: jax.typing.ArrayLike,
-                    max_val: jax.typing.ArrayLike,
-                    key: jax.Array) -> jnp.ndarray:
+def randomize_array(
+    a: jax.typing.ArrayLike,  # Array of Floats
+    min_val: jax.typing.ArrayLike,
+    max_val: jax.typing.ArrayLike,
+    key: jax.Array,
+) -> jnp.ndarray:
     """Returns `a` randomized between max and min.
 
     `a` should be 0, 1, or 2D, and min&max should be 0 or 1D. If min&max are 1D,

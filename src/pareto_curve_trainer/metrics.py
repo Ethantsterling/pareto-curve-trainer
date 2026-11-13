@@ -1,10 +1,13 @@
 """Metrics suitable for training."""
-from enum import IntEnum
-import math
-from typing import Callable, NamedTuple
+
+from collections.abc import Callable
+from typing import NamedTuple
+
 import jax
 import jax.numpy as jnp
-import pareto_curve_trainer.metrics_util as metrics_util
+
+from pareto_curve_trainer import metrics_util
+
 
 #####################
 # Pointwise Metrics #
@@ -12,7 +15,6 @@ import pareto_curve_trainer.metrics_util as metrics_util
 # The simplest metrics can be evaluated one point at a time, by comparing the prediction to the
 # label to produce a point for each score. Then the metric averages those per-point scores to
 # produce a final score for the entire dataset.
-
 def mse_fn(label: jnp.ndarray, pred: jnp.ndarray):
     """Vectorized MSE function."""
     # Predictions should be (#trials, #data).
@@ -35,12 +37,13 @@ def logloss_fn(label: jnp.ndarray, pred: jnp.ndarray) -> float:
     Args:
         pred: Log-odds predictions of the label.
         label: The ground truth probability. Booleans, 0-or-1 ints, or floats.
-    
+
     Returns:
         Negated logloss of using pred as the log-odds prediction of label.
     """
-    loss = (label * jax.nn.log_sigmoid(pred) +
-            (1 - label) * metrics_util.log1p_negative_sigmoid(pred))
+    loss = label * jax.nn.log_sigmoid(pred) + (1 - label) * metrics_util.log1p_negative_sigmoid(
+        pred
+    )
     if jnp.ndim(pred) == 0:
         return loss
     return jnp.average(loss, axis=-1)
@@ -75,17 +78,16 @@ def logloss_fn(label: jnp.ndarray, pred: jnp.ndarray) -> float:
 # Also, the tasks that are difficult to do in jitted JAX (such as averaging within a group and then
 # averaging across groups) can be precalculated so that we perform them once in non-jitted code and
 # then never need to do them in our tight jitted loop.
-def _eval_order_metric(weight_by_position: jnp.ndarray,
-                       label_by_position: jnp.ndarray) -> float:
+def _eval_order_metric(weight_by_position: jnp.ndarray, label_by_position: jnp.ndarray) -> float:
     """Evaluate an order metric on ranks.
-    
+
     Args:
         `weight_by_position`: 1D array that characterizes an order metric on a particular dataset.
             Independent of any particular scoring/ranking model. If the order metric uses groups
             or normalization, then weight_by_position must already incorporate the consequence of
             those groupings or that normalization.
         `labels_by_position`: 1D array of the labels as ordered by some scoring/ranking model.
-    
+
     Returns:
         Float of the average of weight * label. Note that this is not a weighted average!
     """
@@ -105,28 +107,30 @@ class AnchoredOrderMetric(NamedTuple):
     treated as data rather than static/constant. (JAX's jitting needs large arrays to be passed
     as data rather than as constants, because it'll unroll them if they're passed as constants.)
     """
+
     weight_by_position: jnp.ndarray  # 1D float array
 
     def eval(self, label_by_position: jnp.ndarray) -> float:
         """Evaluate an order metric on ranks.
-        
+
         Args:
             `labels_by_position`: 1D array of the labels as ordered by some scoring/ranking model.
             Higher model scores get ranked to lower position indices, so that rank=0 is the highest
             rank. (If the metric uses groups, then rank primarily by group and secondarily by model
             score.)
-        
+
         Returns:
             Float of the weighted average of the label.
         """
         return _eval_order_metric(label_by_position, self.weight_by_position)
 
 
-def anchor_order_metric(rank_to_weight: jnp.ndarray | Callable,
-                        labels: jnp.ndarray,
-                        groups: None | jnp.ndarray=None,
-                        normalize=metrics_util.Normalization.GROUP_UNIT_WEIGHTS,
-                        ) -> AnchoredOrderMetric:
+def anchor_order_metric(
+    rank_to_weight: jnp.ndarray | Callable,
+    labels: jnp.ndarray,
+    groups: None | jnp.ndarray = None,
+    normalize=metrics_util.Normalization.GROUP_UNIT_WEIGHTS,
+) -> AnchoredOrderMetric:
     """Affix an order metric to data.
 
     The resulting AnchoredOrderMetric can be evaluated on any valid reranking of the labels.
@@ -134,7 +138,7 @@ def anchor_order_metric(rank_to_weight: jnp.ndarray | Callable,
     However, the AnchoredOrderMetric is only valid on the same labels & groups used to define it.
 
     This function isn't jittable in JAX, but its output is jittable.
-    
+
     Args:
         rank_to_weight: Maps a row's position index (after sorting) to its corresponding weight.
             If groups are present, then the position index is measured within its group.
@@ -151,7 +155,7 @@ def anchor_order_metric(rank_to_weight: jnp.ndarray | Callable,
         normalize: An IntEnum indicating what normalization (if any) to apply. By default, we
             normalize the weights to an average of 1 (or a per-group average of 1 if using
             groups).
-    
+
     Returns:
         An AnchoredOrderMetric prepared for evaluation on the labels sorted primarily by the groups
         (if groups exist) and secondarily by a model's score. This AnchoredOrderMetric incorporates
@@ -159,6 +163,7 @@ def anchor_order_metric(rank_to_weight: jnp.ndarray | Callable,
     """
     anchored_weights = metrics_util.order_metric_weights(rank_to_weight, labels, groups, normalize)
     return AnchoredOrderMetric(anchored_weights)
+
 
 #######################
 # Group Order Metrics #
@@ -171,7 +176,7 @@ def anchor_order_metric(rank_to_weight: jnp.ndarray | Callable,
 # normalize within groups.
 def group_rank(predictions, groups):
     """Rank primarily by groups (ascending) and secondary by predictions (descending).
-    
+
     Alternative to jnp.lexsort that's ~3x faster on GPU for ~1M points.
     Ranking metrics require this kind of sorting, which is a bottleneck for training.
     """
@@ -181,10 +186,10 @@ def group_rank(predictions, groups):
 
 
 def anchored_ndcg_metric(
-        labels: jnp.ndarray,
-        groups: None | jnp.ndarray,
-        depth: None | int=None) -> AnchoredOrderMetric:
+    labels: jnp.ndarray, groups: None | jnp.ndarray, depth: None | int = None
+) -> AnchoredOrderMetric:
     """Normalized Distributed Cumulative Gain metric."""
+
     def rank_to_weight(rank):
         if depth is None:
             return 1 / jnp.log2(rank + 2)
@@ -194,15 +199,16 @@ def anchored_ndcg_metric(
         rank_to_weight,
         labels=labels,
         groups=groups,
-        normalize=metrics_util.Normalization.GROUP_MAX_ONE)
+        normalize=metrics_util.Normalization.GROUP_MAX_ONE,
+    )
 
 
 def anchored_linear_metric(
     labels: jnp.ndarray,
-    groups: None | jnp.ndarray=None,
-    depth: None | int=None,
-    normalize: metrics_util.Normalization=metrics_util.Normalization.GROUP_UNIT_WEIGHTS,
-    ) -> AnchoredOrderMetric:
+    groups: None | jnp.ndarray = None,
+    depth: None | int = None,
+    normalize: metrics_util.Normalization = metrics_util.Normalization.GROUP_UNIT_WEIGHTS,
+) -> AnchoredOrderMetric:
     """A metric that drops off linearly by position."""
     if depth is None:
         depth = len(labels)
@@ -210,8 +216,4 @@ def anchored_linear_metric(
     def rank_to_weight(rank):
         return jnp.where(rank < depth, 1 - rank * (1 / depth), 0)
 
-    return anchor_order_metric(
-        rank_to_weight,
-        labels=labels,
-        groups=groups,
-        normalize=normalize)
+    return anchor_order_metric(rank_to_weight, labels=labels, groups=groups, normalize=normalize)
