@@ -18,7 +18,7 @@ select = jax.jit(select, static_argnames='target_size')
 
 def test_simple_cull_indices():
     culled = selection.simple_cull_indices(jnp.array([5,2,3,4,1.]), 3)
-    assert jnp.all(culled == jnp.array([0, 2, 3]))
+    assert jnp.array_equal(culled, jnp.array([0, 2, 3]))
 
 
 # Vizier code adapted directly to JAX (replacing np with jnp).
@@ -37,8 +37,8 @@ big_population = jax.random.uniform(key=jax.random.key(123), shape=(500,4))
 
 
 def test_pareto_rank_matches():
-    assert jnp.all(pareto_rank(small_pop) == original_pareto_rank(small_pop))
-    assert jnp.all(pareto_rank(big_population) == original_pareto_rank(big_population))
+    assert jnp.array_equal(pareto_rank(small_pop), original_pareto_rank(small_pop))
+    assert jnp.array_equal(pareto_rank(big_population), original_pareto_rank(big_population))
 
 
 def test_pareto_rank_empty():
@@ -48,7 +48,7 @@ def test_pareto_rank_empty():
 
 def test_pareto_rank_single():
     ys = jnp.array([[1.0, 2.0]])
-    assert jnp.all(pareto_rank(ys) == jnp.array([0]))
+    assert jnp.array_equal(pareto_rank(ys), jnp.array([0]))
 
 
 def test_pareto_rank_simple_dominance():
@@ -56,17 +56,17 @@ def test_pareto_rank_simple_dominance():
     # P0 dominates P2
     # P1 and P2 don't dominate each other.
     ys = jnp.array([[2.0, 3.0], [1.0, 3.0], [2.0, 2.0]])
-    assert jnp.all(pareto_rank(ys) == jnp.array([0, 1, 1]))
+    assert jnp.array_equal(pareto_rank(ys), jnp.array([0, 1, 1]))
 
 
 def test_pareto_rank_no_dominance():
     ys = jnp.array([[1.0, 5.0], [2.0, 4.0], [3.0, 3.0]])
-    assert jnp.all(pareto_rank(ys) == jnp.array([0, 0, 0]))
+    assert jnp.array_equal(pareto_rank(ys), jnp.array([0, 0, 0]))
 
 
 def test_pareto_rank_duplicate_points_do_not_dominate_each_other():
     ys = jnp.array([[2.0, 3.0], [1.0, 2.0], [2.0, 3.0]])
-    assert jnp.all(pareto_rank(ys) == jnp.array([0, 2, 0]))
+    assert jnp.array_equal(pareto_rank(ys), jnp.array([0, 2, 0]))
 
 
 def mask_dominated(dominated, exclusion_mask):
@@ -76,14 +76,14 @@ def mask_dominated(dominated, exclusion_mask):
 def test_pareto_domination():
     domination = pareto_domination(jnp.array([[1], [2], [3.]]))
     # [i][j] means [i] dominates [j]
-    assert jnp.all(domination == jnp.array([
+    assert jnp.array_equal(domination, jnp.array([
        [False, False, False],
        [True, False, False],
        [True, True, False],
     ]))
     # Falsify all rows where the mask is False.
     masked = mask_dominated(domination, jnp.array([True, False, True]))
-    assert jnp.all(masked == jnp.array([
+    assert jnp.array_equal(masked, jnp.array([
        [False, False, False],
        [False, False, False],
        [True, True, False],
@@ -197,7 +197,7 @@ def test_select_by():
 def arrays_same_sorted(xs, ys):
     xs = jnp.sort(jnp.array(xs))
     ys = jnp.sort(jnp.array(ys))
-    return jnp.all(xs == ys)
+    return jnp.array_equal(xs, ys)
 
 
 def test_select():

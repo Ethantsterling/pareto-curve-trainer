@@ -3,7 +3,7 @@
 Instead of tracking a single line of descent, we'll fork many different ways and cull branches.
 Heavily inspired by Vizier (https://github.com/google/vizier).
 """
-from typing import NamedTuple, Self, Union
+from typing import NamedTuple, Self
 import jax
 import jax.numpy as jnp
 
@@ -38,7 +38,7 @@ class Population(NamedTuple):
         trial_ids = jnp.concatenate([self.trial_ids, other.trial_ids])
         return Population(trial_ids=trial_ids, components=components)
 
-    def _new_trial_ids(self, first_id: Union[int, None]=None, increment_index: bool=True) -> jax.typing.ArrayLike:
+    def _new_trial_ids(self, first_id: int|None=None, increment_index: bool=True) -> jax.typing.ArrayLike:
         if first_id is not None:
             return first_id + jnp.arange(self.num_trials())
         if increment_index:
@@ -48,7 +48,7 @@ class Population(NamedTuple):
     def perturbed(self,
                   scale: float,
                   key: jax.Array,
-                  first_id: Union[int, None] = None,
+                  first_id: int|None = None,
                   increment_index:bool = True) -> tuple[Self, jax.Array]:
         """Returns a copy with each component perturbed.
 

@@ -15,13 +15,12 @@ Population = jax.jit(population.Population)
 
 
 def test_extend_array():
-    assert jnp.all(population._extend_array(jnp.array([1, 2, 3]), 6) ==
-                   jnp.array([1,2,3,1,2,3]))
+    assert jnp.array_equal(population._extend_array(jnp.array([1, 2, 3]), 6),
+                           jnp.array([1,2,3,1,2,3]))
     _test_array = jnp.array([(1,2), (3,4), (5,6)])
-    assert jnp.all(population._extend_array(_test_array, 2) ==
-                   jnp.array([(1,2), (3,4)]))
-    assert jnp.all(population._extend_array(_test_array, 5) ==
-                   jnp.array([(1,2), (3,4), (5,6), (1,2), (3,4)]))
+    assert jnp.array_equal(population._extend_array(_test_array, 2), jnp.array([(1,2), (3,4)]))
+    assert jnp.array_equal(population._extend_array(_test_array, 5),
+                           jnp.array([(1,2), (3,4), (5,6), (1,2), (3,4)]))
 
 
 test_population = Population(jnp.array([1]), example_fixtures.test_components)
@@ -35,7 +34,7 @@ def test_population_equality():
 
 def test_filled_size():
     assert filled_test_population.num_trials() == 5
-    assert jnp.all(filled_test_population.trial_ids == jnp.array([1,2,3,4,5]))
+    assert jnp.array_equal(filled_test_population.trial_ids, jnp.array([1,2,3,4,5]))
     assert filled_test_population.max_trial_id() == 5
 
 
@@ -70,5 +69,5 @@ def test_perturbed():
         assert not component == perturbed_component
 
     fp_perturbed_same_ids, _ = fp.perturbed(scale=0.1, increment_index=False, key=random_key)
-    assert jnp.all(fp_perturbed_same_ids.trial_ids == fp.trial_ids)
+    assert jnp.array_equal(fp_perturbed_same_ids.trial_ids, fp.trial_ids)
     assert fp_perturbed.components == fp_perturbed_same_ids.components

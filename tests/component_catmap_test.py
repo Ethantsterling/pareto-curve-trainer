@@ -142,8 +142,8 @@ def test_mixed_2d():
     ys = mixed_map.map.ys
 
     # These should obey the specified monotonicity.
-    assert jnp.all(ys[0] == jnp.sort(ys[0]))            # Mono.UP
-    assert jnp.all(ys[1] == jnp.flip(jnp.sort(ys[1])))  # Mono.DOWN
+    assert jnp.array_equal(ys[0], jnp.sort(ys[0]))            # Mono.UP
+    assert jnp.array_equal(ys[1], jnp.flip(jnp.sort(ys[1])))  # Mono.DOWN
 
     # This should preserve the order of the original ys [-4, -2, -5],
     # since the scale wasn't large enough to change the order.

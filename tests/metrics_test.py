@@ -285,9 +285,9 @@ def test_anchored_linear_metric():
 def test_group_rank():
     labels = jax.random.normal(shape=1000, key=jax.random.key(50))
     groups = jax.random.randint(shape=1000, minval=0, maxval=4, key=jax.random.key(51))
-    assert jnp.all(metrics.group_rank(labels, groups) == jnp.lexsort([-labels, groups]))
+    assert jnp.array_equal(metrics.group_rank(labels, groups), jnp.lexsort([-labels, groups]))
 
     # We'd prefer that the tiebreaking behavior also matches.
     labels_with_ties = jax.random.randint(shape=1000, minval=0, maxval=5, key=jax.random.key(50))
-    assert jnp.all(metrics.group_rank(labels_with_ties, groups) ==
-                   jnp.lexsort([-labels_with_ties, groups]))
+    assert jnp.array_equal(metrics.group_rank(labels_with_ties, groups),
+                           jnp.lexsort([-labels_with_ties, groups]))

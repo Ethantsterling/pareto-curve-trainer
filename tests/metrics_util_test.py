@@ -27,13 +27,13 @@ def test_log1p_negative_sigmoid():
 
 def test_streak_lengths():
     a = jnp.array([2., 2., 3., 5., 5., 5., 6., 6., 7, 8.])
-    assert jnp.all(mu.streak_lengths(a) == jnp.array([2, 1, 3, 2, 1, 1]))
+    assert jnp.array_equal(mu.streak_lengths(a), jnp.array([2, 1, 3, 2, 1, 1]))
 
 
 def test_first_index_matching():
     arr = jnp.array([2., 2., 3., 5., 5., 5., 1., 1., 7, 8.])
     fim  = jnp.array([0,  0,  2,  3,  3,  3,  6,  6,  8, 9])
-    assert jnp.all(mu.first_index_matching(arr) == fim)
+    assert jnp.array_equal(mu.first_index_matching(arr), fim)
 
 
 def eval_order_metric(weights, ordered_labels) -> float:
@@ -139,7 +139,7 @@ def test_normalize_group_weights_to_max_one_min_zero():
 
 def test_within_group_rank():
     groups = jnp.array([3, 2, 2, 1, 1, 1, 3])
-    assert jnp.all(mu.within_group_rank(groups) == jnp.array([0, 1, 2, 0, 1, 0, 1]))
+    assert jnp.array_equal(mu.within_group_rank(groups), jnp.array([0, 1, 2, 0, 1, 0, 1]))
 
 
 def test_order_metric_weights_without_groups():
