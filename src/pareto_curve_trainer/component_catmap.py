@@ -88,6 +88,11 @@ class Catmap(NamedTuple):
     def __eq__(self, other: Self) -> bool:
         return (self.map == other.map) and self.constraints_equal(other)
 
+    # Normally __ne__ falls back to __eq__, but NamedTuple has its own __ne__ defined.
+    # To avoid falling back to NamedTuple.__ne__, we have to specify our own __ne__.
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     # NamedTuple uses __len__ so we can't override that.
     def num_rows(self) -> int:
         """The number of categorical maps represented by this component."""

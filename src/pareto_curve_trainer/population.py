@@ -44,6 +44,17 @@ class Population(NamedTuple):
         trial_ids = jnp.concatenate([self.trial_ids, other.trial_ids])
         return Population(trial_ids=trial_ids, components=components)
 
+    def verticalize(self) -> Self:
+        """Merge down an extra leading dimension."""
+        if jnp.ndim(self.trial_ids) == 1:
+            return self
+
+        def reshape_node(node):
+            return node.reshape(-1, *node.shape[2:])
+
+        new_components = jax.tree.map(reshape_node, self.components)
+        return Population(self.trial_ids.reshape(-1), new_components)
+
     def _new_trial_ids(
         self, first_id: int | None = None, increment_index: bool = True
     ) -> jax.typing.ArrayLike:
@@ -117,9 +128,14 @@ class Population(NamedTuple):
     def __eq__(self, other):
         return (
             (self.num_trials() == other.num_trials())
-            & jnp.all(self.trial_ids == other.trial_ids)
-            & (self.components == other.components)
+            and jnp.array_equal(self.trial_ids, other.trial_ids)
+            and (self.components == other.components)
         )
+
+    # Normally __ne__ falls back to __eq__, but NamedTuple has its own __ne__ defined.
+    # To avoid falling back to NamedTuple.__ne__, we have to specify our own __ne__.
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 
 # This would be cleaner as a classmethod on Population, but that gives JAX trouble.

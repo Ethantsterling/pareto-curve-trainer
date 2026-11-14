@@ -221,17 +221,17 @@ class Pwlcurve:
         """Check if this component's constraints match another component's."""
         return (
             jnp.all(self.xmin == other.xmin)
-            & jnp.all(self.xmax == other.xmax)
-            & jnp.all(self.ymin == other.ymin)
-            & jnp.all(self.ymax == other.ymax)
-            & jnp.all(self.mono == other.mono)
+            and jnp.all(self.xmax == other.xmax)
+            and jnp.all(self.ymin == other.ymin)
+            and jnp.all(self.ymax == other.ymax)
+            and jnp.all(self.mono == other.mono)
         )
 
     def __eq__(self, other):
         return (
             jnp.all(self.xs == other.xs)
-            & jnp.all(self.ys == other.ys)
-            & self.constraints_equal(other)
+            and jnp.all(self.ys == other.ys)
+            and self.constraints_equal(other)
         )
 
 

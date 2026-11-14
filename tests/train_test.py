@@ -17,7 +17,7 @@ from pareto_curve_trainer.example_fixtures import (
     test_population,
     test_xs,
 )
-from pareto_curve_trainer.train import population_train
+from pareto_curve_trainer.train import history_population_train, population_train
 
 POPULATION_SIZE = 5
 NUM_STEPS = 100
@@ -49,7 +49,7 @@ def test_learned_metrics():
 
 
 def test_learned_something():
-    assert not learned_population == test_population
+    assert learned_population != test_population
 
 
 example_ranked_metrics_fn = make_example_ranked_metrics_fn(test_xs)
@@ -73,4 +73,29 @@ def test_ranking_learned_metrics():
 
 
 def test_ranking_learned_something():
-    assert not learned_population_onranked == test_population
+    assert learned_population_onranked != test_population
+
+
+# A tiny training with a ranking metric.
+learned_pop, learned_metrics, history_pop, history_metrics = history_population_train(
+    xs=test_xs,
+    population=test_population,
+    metrics_fn=example_ranked_metrics_fn,
+    model_fn=example_model_fn,
+    population_size=POPULATION_SIZE,
+    num_steps=NUM_STEPS,
+    random_key=jax.random.key(5),
+)
+
+
+def test_history_size():
+    assert learned_metrics.shape == (POPULATION_SIZE, NUM_METRICS)
+    assert learned_pop.num_trials() == POPULATION_SIZE
+    # History should have own row per step.
+    assert history_metrics.shape == (NUM_STEPS, NUM_METRICS)
+    assert history_pop.num_trials() == NUM_STEPS
+    assert jnp.array_equal(history_pop.trial_ids, jnp.arange(1, NUM_STEPS + 1))
+
+
+def test_history_learned_something():
+    assert learned_pop != test_population

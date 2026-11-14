@@ -91,7 +91,7 @@ def _jitted_population_train(
     max_scale: float = 0.1,
     scale_progression: float = 1.0,
     random_key: jax.Array = jax.random.key(12345),
-) -> tuple[Population, jnp.ndarray]:  # No need to return the updated random key IMO.
+) -> tuple[Population, jnp.ndarray]:
     """Returns the trained curves and also the associated metric score. Jitted for performance."""
     scale = max_scale
 
@@ -101,7 +101,6 @@ def _jitted_population_train(
 
     max_trial_id = jnp.max(population.trial_ids)
 
-    ## Putting this for-loop in jitted code isn't working, which is interesting.
     def _train_one_step(_, val):
         population, population_metrics, scale, random_key, max_trial_id = val
 
@@ -159,6 +158,135 @@ def population_train(
     population, random_key = population.fill(fill_size=population_size, key=random_key)
 
     return _jitted_population_train(
+        xs=xs,
+        population=population,
+        metrics_fn=metrics_fn,
+        model_fn=model_fn,
+        num_steps=num_steps // population_size,
+        max_scale=max_scale,
+        scale_progression=scale_progression,
+        random_key=random_key,
+    )
+
+
+def _history_population_train_one_step(
+    *,
+    xs: dict[str, jnp.ndarray],
+    population: Population,
+    population_metrics: jnp.ndarray,  #  2D (population_size, num_metrics) array
+    metrics_fn,  # Function that evalutes and returns our metrics.
+    model_fn,
+    update_scale: float,
+    next_trial_id: int,
+    random_key: jax.Array,
+) -> tuple[tuple[Population, jnp.ndarray], tuple[Population, jnp.ndarray], jnp.ndarray, int]:
+    """Grows, mutates, and culls the population. Returns mutated & culled populations both."""
+    new_population, new_key = population.perturbed(update_scale, random_key, first_id=next_trial_id)
+    max_trial_id = new_population.max_trial_id()
+
+    # Run evals one row at a time inside a jax.lax.map.
+    # If we ran .eval directly, it would take O(population_size * data_size) memory,
+    # which can exceed memory limits for larger populations or data.
+    one_trial_fn = _one_trial_metrics_fn(xs, model_fn, metrics_fn)
+    new_population_metrics = jax.lax.map(one_trial_fn, new_population.components)
+    new_population_metrics = jnp.stack(new_population_metrics, axis=1)
+
+    combined_population = population.stack(new_population)
+    combined_population_metrics = jnp.concatenate([population_metrics, new_population_metrics])
+
+    # We filter by indices instead of boolean mask for ease of jitting.
+    # JAX needs to know the size of each array at jitting time. The size of arr[indices] depends
+    # only on the size of indices, not the values of the indices contents, which works for jitting.
+    # The size of arr[bool_mask] depends on the values in bool_mask, which would break jitting.
+    kept_indices = select(combined_population_metrics, target_size=len(population_metrics))
+    kept_population = combined_population.filter(kept_indices)
+    kept_population_metrics = combined_population_metrics[kept_indices]
+
+    return (
+        (kept_population, kept_population_metrics),
+        (new_population, new_population_metrics),
+        new_key,
+        max_trial_id,
+    )
+
+
+@jax.jit(static_argnames=["model_fn", "num_steps"])
+def _jitted_history_population_train(
+    *,
+    xs: dict[str, jnp.ndarray],
+    population: Population,  # This must be already filled.
+    metrics_fn,  #: Metrics callable that knows where in xs to find the labels.
+    model_fn,
+    num_steps: int,
+    max_scale: float,
+    scale_progression: float,
+    random_key: jax.Array,
+) -> tuple[Population, jnp.ndarray, Population, jnp.ndarray]:
+    """Returns the trained curves and also the associated metric score. Jitted for performance."""
+    scale = max_scale
+
+    one_trial_fn = _one_trial_metrics_fn(xs, model_fn, metrics_fn)
+    population_metrics = jax.lax.map(one_trial_fn, population.components)
+    population_metrics = jnp.stack(population_metrics, axis=1)
+    max_trial_id = jnp.max(population.trial_ids)
+
+    def _train_one_step(carry, _):
+        population, population_metrics, scale, random_key, max_trial_id = carry
+
+        kept_pm, new_pm, new_key, max_trial_id = _history_population_train_one_step(
+            xs=xs,
+            population=population,
+            population_metrics=population_metrics,
+            metrics_fn=metrics_fn,
+            model_fn=model_fn,
+            update_scale=scale,
+            next_trial_id=max_trial_id + 1,
+            random_key=random_key,
+        )
+        new_scale = scale * scale_progression
+        kept_population, kept_population_metrics = kept_pm
+        new_population, new_population_metrics = new_pm
+        carry = kept_population, kept_population_metrics, new_scale, new_key, max_trial_id
+        stack = new_population, new_population_metrics
+        return carry, stack
+
+    carry, stack = jax.lax.scan(
+        f=_train_one_step,
+        init=(population, population_metrics, scale, random_key, max_trial_id),
+        length=num_steps - 1,  # The first batch is the initial population.
+    )
+
+    final_population, final_population_metrics, _, _, _ = carry
+    full_population, full_population_metrics = stack
+    # scan stacks the population/metrics along an additional axis, and doesn't record the initial
+    # population, so we have to stack them up before returning.
+    full_population_metrics = jnp.concatenate(full_population_metrics, axis=0)
+    full_population_metrics = jnp.concatenate([population_metrics, full_population_metrics])
+    full_population = full_population.verticalize()
+    full_population = population.stack(full_population)
+
+    return final_population, final_population_metrics, full_population, full_population_metrics
+
+
+def history_population_train(
+    *,
+    xs: dict[str, jnp.ndarray],
+    population: Population,
+    metrics_fn,
+    model_fn,
+    population_size: int = 50,
+    num_steps: int = 100_000,
+    max_scale: float = 0.1,
+    min_scale: float = 0.01,
+    random_key: jax.Array = jax.random.key(12345),
+) -> tuple[Population, jnp.ndarray, Population, jnp.ndarray]:
+    """A non-jitted wrapper that sets up and runs a population-based training."""
+    if inspect.isfunction(metrics_fn):
+        metrics_fn = _metrics_fn_as_pytree(metrics_fn)
+    scale_progression = (min_scale / max_scale) ** (population_size / num_steps)
+    population, random_key = population.fill(fill_size=population_size, key=random_key)
+
+    return _jitted_history_population_train(
         xs=xs,
         population=population,
         metrics_fn=metrics_fn,

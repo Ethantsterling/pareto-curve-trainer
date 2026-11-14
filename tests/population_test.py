@@ -71,7 +71,7 @@ def test_perturbed():
     for component_key, component in fp.components.items():
         perturbed_component = fp_perturbed.components[component_key]
         assert component.constraints_equal(perturbed_component)
-        assert not component == perturbed_component
+        assert component != perturbed_component
 
     fp_perturbed_same_ids, _ = fp.perturbed(scale=0.1, increment_index=False, key=random_key)
     assert jnp.array_equal(fp_perturbed_same_ids.trial_ids, fp.trial_ids)

@@ -14,7 +14,7 @@ from pareto_curve_trainer.example_fixtures import (
     make_example_ranked_metrics_fn,
     test_population,
 )
-from pareto_curve_trainer.train import population_train
+from pareto_curve_trainer.train import history_population_train, population_train
 
 test_xs_10k = generate_xs(10_000)
 test_xs_100k = generate_xs(100_000)
@@ -65,6 +65,38 @@ def benchmark_training(
     print(f"Runtime: {elapsed_time:.4f} seconds.\n")
 
 
+def benchmark_training_with_history(
+    xs, num_steps, population_size=50, device_type="CPU", metrics_fn=example_metrics_fn
+):
+    """Measure training time with history enabled."""
+    num_xs = len(next(iter(xs.values())))  # xs is a dictionary of 1D arrays.
+    size = f"{num_xs:_} points for {num_steps:_} steps with history enabled"
+
+    if not is_device_available(device_type):
+        print(f"{device_type} not available. Skipping {device_type} benchmark with {size}.\n")
+        return
+
+    device = jax.devices(device_type.lower())[0]
+    print(f"Training on {device.platform.upper()} with {size}.")
+
+    with jax.default_device(device):
+        start_time = time.perf_counter()
+        _, learned_scores, _, _ = history_population_train(
+            xs=xs,
+            population=test_population,
+            metrics_fn=metrics_fn,
+            model_fn=example_model_fn,
+            population_size=population_size,
+            num_steps=num_steps,
+            random_key=jax.random.key(5),
+        )
+        learned_scores.block_until_ready()
+        end_time = time.perf_counter()
+
+    elapsed_time = end_time - start_time
+    print(f"Runtime: {elapsed_time:.4f} seconds.\n")
+
+
 print("""Benchmarking with two group ranking objectives and four components:
   * two scalar components,
   * one catmap component,
@@ -83,7 +115,21 @@ benchmark_training(
     metrics_fn=ranking_metrics_fn_10k,
 )
 
+benchmark_training_with_history(
+    xs=test_xs_10k,
+    num_steps=10_000,
+    device_type="CPU",
+    metrics_fn=ranking_metrics_fn_10k,
+)
+
 benchmark_training(
+    xs=test_xs_100k,
+    num_steps=10_000,
+    device_type="GPU",
+    metrics_fn=ranking_metrics_fn_100k,
+)
+
+benchmark_training_with_history(
     xs=test_xs_100k,
     num_steps=10_000,
     device_type="GPU",
@@ -98,6 +144,13 @@ benchmark_training(
 )
 
 benchmark_training(
+    xs=test_xs_1m,
+    num_steps=100_000,
+    device_type="GPU",
+    metrics_fn=ranking_metrics_fn_1m,
+)
+
+benchmark_training_with_history(
     xs=test_xs_1m,
     num_steps=100_000,
     device_type="GPU",

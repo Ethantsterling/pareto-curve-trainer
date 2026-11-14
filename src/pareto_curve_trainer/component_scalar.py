@@ -52,11 +52,16 @@ class Scalar(NamedTuple):
         """Returns whether the constraints"""
         return (
             (jnp.shape(self.smin) == jnp.shape(other.smin))
-            & (jnp.shape(self.smax) == jnp.shape(other.smax))
-            & jnp.all(self.smin == other.smin)
-            & jnp.all(self.smax == other.smax)
+            and (jnp.shape(self.smax) == jnp.shape(other.smax))
+            and jnp.all(self.smin == other.smin)
+            and jnp.all(self.smax == other.smax)
         )
 
     def __eq__(self, other: Self):
         s_identical = (jnp.shape(self.s) == jnp.shape(other.s)) & jnp.all(self.s == other.s)
         return s_identical & self.constraints_equal(other)
+
+    # Normally __ne__ falls back to __eq__, but NamedTuple has its own __ne__ defined.
+    # To avoid falling back to NamedTuple.__ne__, we have to specify our own __ne__.
+    def __ne__(self, other):
+        return not self.__eq__(other)
