@@ -250,14 +250,14 @@ def _jitted_history_population_train(
         stack = new_population, new_population_metrics
         return carry, stack
 
-    carry, stack = jax.lax.scan(
+    final_step, history = jax.lax.scan(
         f=_train_one_step,
         init=(population, population_metrics, scale, random_key, max_trial_id),
         length=num_steps - 1,  # The first batch is the initial population.
     )
 
-    final_population, final_population_metrics, _, _, _ = carry
-    full_population, full_population_metrics = stack
+    final_population, final_population_metrics, _, _, _ = final_step
+    full_population, full_population_metrics = history
     # scan stacks the population/metrics along an additional axis, and doesn't record the initial
     # population, so we have to stack them up before returning.
     full_population_metrics = jnp.concatenate(full_population_metrics, axis=0)
