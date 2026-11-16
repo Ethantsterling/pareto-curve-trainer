@@ -1,6 +1,8 @@
 """Tools for analyzing a dataset before and after training."""
 
 import altair as alt
+import jax
+import jax.numpy as jnp
 
 
 def plot_2d(
@@ -46,3 +48,29 @@ def plot_2d(
         params["color"] = alt.Color(category, scale=alt.Scale(scheme="dark2"))
 
     return alt.Chart(df).mark_circle(size=60).encode(**params).interactive()
+
+
+def shuffle_importance(
+    xs: dict[jnp.array],
+    components: dict,
+    model_fn,
+    metrics_fn,
+    features: dict,
+    key=jax.random.key(8345),
+) -> dict[jnp.array]:
+    """Measure the metric loss from shuffling features."""
+    baseline = jnp.array(metrics_fn(xs, model_fn(components, xs)))
+    keys = jax.random.split(key, num=len(features))
+
+    metric_diffs = {}
+    for fkey, feature in zip(keys, features):
+        feature_x = xs[feature]
+        shuffled_feature_x = jax.random.permutation(fkey, feature_x)
+        # Calculate metrics with the one feature ablated through shuffling.
+        xs[feature] = shuffled_feature_x
+        shuffled_metrics_x = jnp.array(metrics_fn(xs, model_fn(components, xs)))
+        metric_diffs[feature] = shuffled_metrics_x - baseline
+        # Restore xs.
+        xs[feature] = feature_x
+
+    return metric_diffs
