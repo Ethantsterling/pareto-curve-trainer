@@ -205,3 +205,48 @@ def randomize_array(
 
     new_a = jax.random.uniform(key=key, shape=jnp.shape(a), minval=min_val, maxval=max_val)
     return new_a
+
+
+def perturb_bool_array(
+    a: jax.typing.ArrayLike,  # boolean array
+    scale: float,
+    key: jax.Array,
+) -> jnp.ndarray:  # boolean array
+    """Returns `a` with a p(scale) chance of swapping True<-->False."""
+    swap = jax.random.bernoulli(key=key, p=scale, shape=jnp.shape(a))
+    return jnp.where(swap, ~a, a)
+
+
+def randomize_bool_array(
+    a: jax.typing.ArrayLike,  # boolean array
+    key: jax.Array,
+) -> jnp.ndarray:  # boolean array
+    """Returns `a` with a p(scale) chance of swapping True<-->False."""
+    return jax.random.bernoulli(key=key, shape=jnp.shape(a))
+
+
+def perturb_categorical_array(
+    a: jax.typing.ArrayLike,  # int 0...num_categories-1 array
+    num_categories: int,
+    scale: float,
+    key: jax.Array,
+) -> jnp.ndarray:  # int 0...num_categories-1 array
+    """Returns `a` with a p(scale) chance of swapping to a different category at random."""
+    key1, key2 = jax.random.split(key)
+    randomized_category = jax.random.randint(
+        key=key1, minval=0, maxval=num_categories, shape=jnp.shape(a)
+    )
+    # The randomizer could land on the original category, so we increase the randomization chance
+    # to account for that.
+    p_randomize = scale * num_categories / (num_categories - 1)
+    swap = jax.random.bernoulli(key=key2, p=p_randomize, shape=jnp.shape(a))
+    return jnp.where(swap, randomized_category, a)
+
+
+def randomize_categorical_array(
+    a: jax.typing.ArrayLike,  # int 0...num_categories-1 array
+    num_categories: int,
+    key: jax.Array,
+) -> jnp.ndarray:  # int 0...num_categories-1 array
+    """Returns `a` with a randomized category."""
+    return jax.random.randint(key=key, minval=0, maxval=num_categories, shape=jnp.shape(a))

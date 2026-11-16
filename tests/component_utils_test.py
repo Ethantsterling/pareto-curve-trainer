@@ -118,3 +118,66 @@ def test_randomize_obeys_min_and_max():
     assert (randomized_array != test_array).all()  # Technically it could, but it won't.
     assert (randomized_array <= MAX).all()
     assert (randomized_array >= MIN).all()
+
+
+def test_randomize_bool_array():
+    array_key, randomize_key = jax.random.split(jax.random.key(5))
+    test_array = jax.random.bernoulli(key=array_key, shape=1000)
+    randomized_array = cu.randomize_bool_array(test_array, key=randomize_key)
+    assert not jnp.array_equal(test_array, randomized_array)  # It's possible but implausible.
+    # ~half should be True, ~half should be False.
+    assert jnp.isclose(jnp.sum(randomized_array), 500, atol=20, rtol=0)
+    # ~half should match the test_array, ~half should differ.
+    matches = test_array == randomized_array
+    assert jnp.isclose(jnp.sum(matches), 500, atol=20, rtol=0)
+
+
+def test_perturb_bool_array():
+    test_array = jax.random.bernoulli(key=jax.random.key(54321), shape=1000)
+    for key, scale in enumerate([0.01, 0.05, 0.1, 0.2, 0.5]):
+        perturbed_array = cu.perturb_bool_array(test_array, scale=scale, key=jax.random.key(key))
+        assert not jnp.array_equal(test_array, perturbed_array)  # It's possible but implausible.
+        num_diffs = jnp.sum(test_array != perturbed_array)
+        expected_num_diffs = 1000 * scale
+        print(scale, num_diffs, expected_num_diffs)
+        assert jnp.isclose(num_diffs, expected_num_diffs, atol=10, rtol=0.1)
+
+
+def test_randomize_categorical_array():
+    num_categories = 5
+    array_key, randomize_key = jax.random.split(jax.random.key(5))
+    test_array = jax.random.randint(minval=0, maxval=num_categories, key=array_key, shape=1000)
+    randomized_array = cu.randomize_categorical_array(
+        test_array, num_categories=num_categories, key=randomize_key
+    )
+    assert not jnp.array_equal(test_array, randomized_array)  # It's possible but implausible.
+    # Should be split ~evenly between the categories.
+    _, counts = jnp.unique_counts(randomized_array)
+    expected_counts = jnp.array([200] * 5)
+    assert jnp.allclose(counts, expected_counts, atol=10, rtol=0.1)
+
+    # Randomly, they should match 1 / num_category of the time.
+    matches = test_array == randomized_array
+    assert jnp.isclose(jnp.sum(matches), 200, atol=10, rtol=0)
+
+
+def test_perturb_categorical_array():
+    num_categories = 5
+    test_array = jax.random.randint(
+        minval=0, maxval=num_categories, key=jax.random.key(54321), shape=1000
+    )
+    for key, scale in enumerate([0.01, 0.05, 0.1, 0.2, 0.5]):
+        perturbed_array = cu.perturb_categorical_array(
+            test_array, scale=scale, key=jax.random.key(key), num_categories=num_categories
+        )
+        assert not jnp.array_equal(test_array, perturbed_array)  # It's possible but implausible.
+        num_diffs = jnp.sum(test_array != perturbed_array)
+        expected_num_diffs = 1000 * scale
+        print(scale, num_diffs, expected_num_diffs)
+        assert jnp.isclose(num_diffs, expected_num_diffs, atol=10, rtol=0.2)
+
+        # The original array was ~evenly distributed between categories, so the perturbed version
+        # should be too.
+        _, counts = jnp.unique_counts(perturbed_array)
+        expected_counts = jnp.array([200] * 5)
+        assert jnp.allclose(counts, expected_counts, atol=10, rtol=0.1)
