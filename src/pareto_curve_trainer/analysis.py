@@ -90,6 +90,7 @@ def plot_pwlcurve(pwlcurve: component_pwlcurve.Pwlcurve, name: str):
     plt.plot(xs, ys)
     plt.scatter(xs, ys)
     if fx is not None and fx is not transforms.Identity:
+        ax.set_xlabel(f"{fx.__name__} transform")
         fx = fx.as_numpy()  # For compatibility with matplotlib.
         ax.set_xscale("function", functions=(fx, fx.inverse))
 
@@ -102,7 +103,7 @@ def plot_catmap(catmap: component_catmap.Catmap, name: str):
     ys = catmap.map.ys
     if jnp.ndim(ys) == 2:
         ys = ys[0]
-    categories = [str(y) for y in ys]
+    categories = [str(i) for i in range(len(ys))]
     plt.bar(categories, ys, label=name)
     plt.legend(labels=[name])
     plt.show()
@@ -112,10 +113,9 @@ def _get_scalar_value(s):
     value = s.s
     if jnp.ndim(value) == 1:
         return value[0]
-    elif jnp.ndim(value) == 2:
+    if jnp.ndim(value) == 2:
         return value[0][0]
-    else:
-        return value
+    return value
 
 
 def plot_bool(s: component_scalar.Bool, name: str):
