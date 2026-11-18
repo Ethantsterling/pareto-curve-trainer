@@ -4,6 +4,21 @@ import math
 from abc import ABCMeta, abstractmethod
 
 import jax.numpy as jnp
+import numpy as np
+
+
+class NumpyTransform(ABCMeta):
+    """Abstract class that couples a fn:R-->R with its inverse."""
+
+    # Overrides __init__ so we can use a Transform subclass like a function.
+    def __call__(cls, x: np.ndarray) -> np.ndarray:
+        """Forward transform."""
+        return cls.__call__(x)
+
+    @staticmethod
+    @abstractmethod
+    def inverse(x: np.ndarray) -> np.ndarray:
+        """Inverse transform. Inverts .__call__."""
 
 
 class Transform(ABCMeta):
@@ -19,6 +34,11 @@ class Transform(ABCMeta):
     def inverse(x: jnp.ndarray) -> jnp.ndarray:
         """Inverse transform. Inverts .__call__."""
 
+    @staticmethod
+    @abstractmethod
+    def as_numpy() -> NumpyTransform:
+        """Numpy version of the transform, which we need for analyis with matplotlib."""
+
 
 class Identity(metaclass=Transform):
     """The identity transform. Maps x to x."""
@@ -32,6 +52,25 @@ class Identity(metaclass=Transform):
     def inverse(x: jnp.ndarray):
         """No-op. Returns the inverse of the identity of x, which is x."""
         return x
+
+    @staticmethod
+    def as_numpy():
+        """Numpy version of Identity, which we need for analyis with matplotlib."""
+        return Identity  # It's already usable with numpy.
+
+
+class NumpySymlog1p(metaclass=Transform):
+    """A symmetric extension of log1p(x >= 0) to all real x, with an attached inverse."""
+
+    @staticmethod
+    def __call__(x: np.ndarray):
+        """A symmetric extension of log1p(x >= 0) to all real x."""
+        return np.sign(x) * np.log1p(np.abs(x))
+
+    @staticmethod
+    def inverse(x: np.ndarray):
+        """The inverse of the symmetric extension of log1p(x >= 0) to all real x."""
+        return np.sign(x) * np.expm1(np.abs(x))
 
 
 class Symlog1p(metaclass=Transform):
@@ -47,6 +86,25 @@ class Symlog1p(metaclass=Transform):
         """The inverse of the symmetric extension of log1p(x >= 0) to all real x."""
         return jnp.sign(x) * jnp.expm1(jnp.abs(x))
 
+    @staticmethod
+    def as_numpy():
+        """Numpy version of Symlog1p, which we need for analyis with matplotlib."""
+        return NumpySymlog1p
+
+
+class NumpyLog(metaclass=Transform):
+    """The log transform extended to all real x by clipping inputs, with an attached inverse."""
+
+    @staticmethod
+    def __call__(x: np.ndarray):
+        """An extension of log(x) to the reals. Negative values are mapped to -inf."""
+        return np.log(np.clip(x, min=0))
+
+    @staticmethod
+    def inverse(x: np.ndarray):
+        """The inverse of log, which is exp."""
+        return np.exp(x)
+
 
 class Log(metaclass=Transform):
     """The log transform extended to all real x by clipping inputs, with an attached inverse."""
@@ -60,6 +118,11 @@ class Log(metaclass=Transform):
     def inverse(x: jnp.ndarray):
         """The inverse of log, which is exp."""
         return jnp.exp(x)
+
+    @staticmethod
+    def as_numpy():
+        """Numpy version of Log, which we need for analyis with matplotlib."""
+        return NumpyLog
 
 
 def uniformity_divergence_score(sorted_xs: jnp.ndarray) -> float:

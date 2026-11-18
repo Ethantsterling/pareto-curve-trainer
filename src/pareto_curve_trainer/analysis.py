@@ -3,6 +3,9 @@
 import altair as alt
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
+
+from pareto_curve_trainer import component_catmap, component_pwlcurve, component_scalar, transforms
 
 
 def plot_2d(
@@ -74,3 +77,79 @@ def shuffle_importance(
         xs[feature] = feature_x
 
     return metric_diffs
+
+
+def plot_pwlcurve(pwlcurve: component_pwlcurve.Pwlcurve, name: str):
+    """Plot a learned piecewise-linear curve."""
+    xs, ys, fx = pwlcurve.xs, pwlcurve.ys, pwlcurve.fx
+    if jnp.ndim(xs) == 2:
+        xs = xs[0]
+        ys = ys[0]
+
+    ax = plt.axes()
+    plt.plot(xs, ys)
+    plt.scatter(xs, ys)
+    if fx is not None and fx is not transforms.Identity:
+        fx = fx.as_numpy()  # For compatibility with matplotlib.
+        ax.set_xscale("function", functions=(fx, fx.inverse))
+
+    plt.legend(labels=[name])
+    plt.show()
+
+
+def plot_catmap(catmap: component_catmap.Catmap, name: str):
+    """Plot a learned categorical map."""
+    ys = catmap.map.ys
+    if jnp.ndim(ys) == 2:
+        ys = ys[0]
+    categories = [str(y) for y in ys]
+    plt.bar(categories, ys, label=name)
+    plt.legend(labels=[name])
+    plt.show()
+
+
+def _get_scalar_value(s):
+    value = s.s
+    if jnp.ndim(value) == 1:
+        return value[0]
+    elif jnp.ndim(value) == 2:
+        return value[0][0]
+    else:
+        return value
+
+
+def plot_bool(s: component_scalar.Bool, name: str):
+    """'Plot' a boolean constant by printing it out."""
+    print(f"{name}: {_get_scalar_value(s)}")
+
+
+def plot_categorical(s: component_scalar.Categorical, name: str):
+    """'Plot' a categorical constant by printing it out."""
+    print(f"{name}: {_get_scalar_value(s)} (categorical)")
+
+
+def plot_scalar(s: component_scalar.Scalar, name: str):
+    """'Plot' a scalar constant by printing it out."""
+    print(f"{name}: {_get_scalar_value(s)}")
+
+
+def plot_component(component, name):
+    """Plot a learned component."""
+    if isinstance(component, component_catmap.Catmap):
+        plot_catmap(component, name)
+    elif isinstance(component, component_pwlcurve.Pwlcurve):
+        plot_pwlcurve(component, name)
+    elif isinstance(component, component_scalar.Bool):
+        plot_bool(component, name)
+    elif isinstance(component, component_scalar.Categorical):
+        plot_categorical(component, name)
+    elif isinstance(component, component_scalar.Scalar):
+        plot_scalar(component, name)
+    else:
+        print(f"Could not identify component {name}: {component}")
+
+
+def plot_components(components):
+    """Plot a dict of learned components."""
+    for name, component in components.items():
+        plot_component(component, name)

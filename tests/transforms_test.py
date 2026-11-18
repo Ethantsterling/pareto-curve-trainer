@@ -43,12 +43,14 @@ def test_best_transform_with_negative_values():
 
 
 def test_identity_transform():
+    Identity.as_numpy()
     xs = jnp.linspace(-10.0, 10, num=1000)
     assert jnp.array_equal(xs, Identity(xs))
     assert jnp.array_equal(xs, Identity.inverse(xs))
 
 
 def test_symlog1p_transform():
+    Symlog1p.as_numpy()
     xs = jnp.exp(jnp.linspace(-10.0, 10, num=1000))
 
     assert jnp.allclose(jnp.log1p(xs), Symlog1p(xs))
@@ -63,6 +65,7 @@ def test_symlog1p_transform():
 
 
 def test_log_transform():
+    Log.as_numpy()
     xs = jnp.exp(jnp.linspace(-10.0, 10, num=1000))
 
     assert jnp.allclose(jnp.log(xs), Log(xs))

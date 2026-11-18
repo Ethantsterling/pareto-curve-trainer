@@ -76,3 +76,8 @@ def test_perturbed():
     fp_perturbed_same_ids, _ = fp.perturbed(scale=0.1, increment_index=False, key=random_key)
     assert jnp.array_equal(fp_perturbed_same_ids.trial_ids, fp.trial_ids)
     assert fp_perturbed.components == fp_perturbed_same_ids.components
+
+
+def test_get():
+    assert fp.get_at_index(0) == example_fixtures.test_components
+    assert fp.get_trial(1) == example_fixtures.test_components

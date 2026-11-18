@@ -120,6 +120,14 @@ class Population(NamedTuple):
         new_components = jax.tree.map(lambda node: node[filter_array], self.components)
         return self._replace(trial_ids=new_trial_ids, components=new_components)
 
+    def get_trial(self, trial_id: int) -> Self:
+        """Returns the components of the trial at trial_id."""
+        return self.filter(self.trial_ids == trial_id).components
+
+    def get_at_index(self, index: int) -> Self:
+        """Returns the components of the index'th trial (not trial_id=index)."""
+        return self.get_trial(self.trial_ids[index])
+
     def __str__(self):
         trial_ids_str = f"Population trial_ids: {self.trial_ids}"
         components_strs = [f"{name}: {component}" for name, component in self.components.items()]

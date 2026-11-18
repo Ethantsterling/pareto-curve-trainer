@@ -212,7 +212,9 @@ class Pwlcurve:
 
     def as_struct_pwlcurves(self) -> list[StructPwlcurve]:
         """Returns a list of single pwlcurves without training constraints."""
-        return [StructPwlcurve(xarray, yarray) for (xarray, yarray) in zip(self.xs, self.ys)]
+        return [
+            StructPwlcurve(xarray, yarray, fx=self.fx) for (xarray, yarray) in zip(self.xs, self.ys)
+        ]
 
     # NamedTuple uses __len__ so we can't override that.
     def num_rows(self) -> int:
