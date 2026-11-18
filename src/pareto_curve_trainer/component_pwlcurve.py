@@ -198,6 +198,8 @@ class Pwlcurve:
 
     def merge(self, other: Self) -> Self:
         """Concatenate this vector of curves with another."""
+        assert self.xs.shape[-1] == other.xs.shape[-1]
+        assert self.ys.shape[-1] == other.ys.shape[-1]
         return self.__replace__(
             xs=jnp.concatenate([self.xs, other.xs]),
             ys=jnp.concatenate([self.ys, other.ys]),

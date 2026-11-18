@@ -26,6 +26,10 @@ class InternalCatmap(NamedTuple):
     def __eq__(self, other: Self):
         return (self.ys == other.ys).all()
 
+    def num_categories(self):
+        """The number of categories in the map."""
+        return self.ys.shape[-1]
+
 
 class Catmap(NamedTuple):
     """A vectorized, trainable component representing category-to-float maps."""
@@ -58,6 +62,7 @@ class Catmap(NamedTuple):
 
     def merge(self, other: Self) -> Self:
         """We have to control for the weird dimensionality possibilities."""
+        assert self.map.num_categories() == other.map.num_categories()
         merged_map = self.map.merge(other.map)
         # For a clean merge, we need to broadcast the params to the correct dimensionality.
         sdim = (cu._2D(self.map.ys).shape[0],)
@@ -80,7 +85,8 @@ class Catmap(NamedTuple):
     def constraints_equal(self, other: Self):
         """Check if this Catmap has the same constraint parameters as another."""
         return (
-            jnp.all(self.ymin == other.ymin)
+            self.map.num_categories() == other.map.num_categories()
+            and jnp.all(self.ymin == other.ymin)
             and jnp.all(self.ymax == other.ymax)
             and jnp.all(self.mono == other.mono)
         )

@@ -134,10 +134,9 @@ class Categorical:
 
     def merge(self, other) -> Self:
         """Concatenates this `scalar` with another `scalar`."""
+        assert self.constraints_equal(other)
         s = jnp.concatenate([cu._1D(self.s), cu._1D(other.s)])
-        # Merging categoricals with different numbers of categories is suspicious but possible.
-        num_categories = max(self.num_categories, other.num_categories)
-        return Categorical(s=s, num_categories=num_categories)
+        return Categorical(s=s, num_categories=self.num_categories)
 
     def num_rows(self) -> int:
         """Returns the number of scalar values s in this `scalar`."""
